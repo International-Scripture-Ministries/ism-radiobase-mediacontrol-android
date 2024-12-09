@@ -399,7 +399,7 @@ class MediaControlPlugin : Plugin() {
     }
 
     @PluginMethod
-    fun playing(call: PluginCall) {
+    fun isPlaying(call: PluginCall) {
         try {
             val ret = JSObject()
             Thread {
