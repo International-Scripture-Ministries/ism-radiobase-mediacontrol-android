@@ -46,6 +46,9 @@ class MediaControlWeb extends core.WebPlugin {
     clearPlaylist() {
         return;
     }
+    getDuration(options) {
+        return Promise.resolve(options);
+    }
     getUpdate() {
         throw new Error('Method not implemented.');
     }

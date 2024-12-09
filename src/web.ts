@@ -56,6 +56,10 @@ export class MediaControlWeb extends WebPlugin implements MediaControlPlugin {
         return
     }
 
+    getDuration(options: { audio: string; }): any {
+        return Promise.resolve(options);
+    }
+
     getUpdate(): Promise<{ state: string; position: string; duration: string; url: string }> {
         throw new Error('Method not implemented.');
     }

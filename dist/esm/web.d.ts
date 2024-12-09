@@ -35,6 +35,9 @@ export declare class MediaControlWeb extends WebPlugin implements MediaControlPl
         result: JSON;
     }>;
     clearPlaylist(): void;
+    getDuration(options: {
+        audio: string;
+    }): any;
     getUpdate(): Promise<{
         state: string;
         position: string;

@@ -241,6 +241,29 @@ export interface MediaControlPlugin {
         url: string;
     }>;
     /**
+     * Returns duration of the provided audio in milliseconds.
+     *
+     * @returns {Promise<{ url: boolean; duration: string; }>}
+     * - `url`: The URL of the currently checked audio.
+     * - `duration`: The total duration of the checked audio.
+     *
+     * @example
+     * player.getDuration({
+     *     audio: 'https://example.com/audio.mp3'
+     * }).then((result) => {
+     *     console.log('Audio url:', result.url);
+     *     console.log('Audio duration:', result.duration);
+     * }).catch((error) => {
+     *     console.error('Error checking audio duration:', error);
+     * });
+     */
+    getDuration(options: {
+        audio: string;
+    }): Promise<{
+        url: string;
+        duration: boolean;
+    }>;
+    /**
      * Adds an event listener for player updates.
      *
      * @param {string} eventName - The name of the event to listen for (e.g., `'playerUpdates'`).

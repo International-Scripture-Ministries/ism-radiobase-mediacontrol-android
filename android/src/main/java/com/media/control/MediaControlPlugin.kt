@@ -1,6 +1,7 @@
 package com.media.control
 
 import android.content.ComponentName
+import android.content.Context
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
@@ -10,6 +11,7 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
 import androidx.media3.common.Tracks
+import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.getcapacitor.JSObject
@@ -109,8 +111,10 @@ class MediaControlPlugin : Plugin() {
                 audio = call.data.getString("audio")?.takeIf { it != "NaN" } ?: ""
                 cover = call.data.getString("cover")?.takeIf { it != "NaN" } ?: ""
                 title = call.data.getString("title")?.takeIf { it != "NaN" } ?: ""
-                playbackPos = call.data.getString("playbackPosition")?.takeIf { it != "NaN" } ?: Const.DEFAUT_POS
-                playbackSpeed = call.data.getString("playbackSpeed")?.takeIf { it != "NaN" } ?: Const.DEFAUT_SPEED
+                playbackPos = call.data.getString("playbackPosition")?.takeIf { it != "NaN" }
+                    ?: Const.DEFAUT_POS
+                playbackSpeed = call.data.getString("playbackSpeed")?.takeIf { it != "NaN" }
+                    ?: Const.DEFAUT_SPEED
 
                 if (verifyAudio(audio)) {
                     mAudioData = AudioData(audio, cover, title, playbackPos, playbackSpeed)
@@ -460,6 +464,29 @@ class MediaControlPlugin : Plugin() {
         }
     }
 
+    @PluginMethod
+    fun getDuration(call: PluginCall) {
+        if (call != null) {
+            try {
+                val mAudio = call.data.getString("audio")?.takeIf { it != "NaN" } ?: ""
+                val ret = JSObject()
+                Thread {
+                    Handler(Looper.getMainLooper()).post {
+                        getAudioDuration(context, mAudio) { duration ->
+                            ret.put("url", mAudio)
+                            ret.put("duration", duration.toString())
+                            call.resolve(ret)
+                        }
+                    }
+                }.start()
+            } catch (e: Exception) {
+                val ret = JSObject()
+                ret.put("message", e.toString())
+                call.reject(Const.ERROR, ret)
+            }
+        }
+    }
+
     private val playerPosition: Runnable = object : Runnable {
         override fun run() {
             try {
@@ -625,6 +652,23 @@ class MediaControlPlugin : Plugin() {
                 mDBHelper.insertAudio(mCurrentAudio.value)
             }
         }
+    }
+
+    private fun getAudioDuration(context: Context, audioUri: String, callback: (Long) -> Unit) {
+        val exoPlayer = ExoPlayer.Builder(context).build()
+        val mediaItem = MediaItem.fromUri(audioUri)
+        exoPlayer.setMediaItem(mediaItem)
+        exoPlayer.prepare()
+        exoPlayer.addListener(object : Player.Listener {
+            override fun onMediaMetadataChanged(mediaMetadata: MediaMetadata) {
+                super.onMediaMetadataChanged(mediaMetadata)
+                val duration = exoPlayer.duration
+                if (duration > 0) {
+                    callback(duration)
+                    exoPlayer.release()
+                }
+            }
+        })
     }
 
     private fun mediaControllerUpdates(controller: MediaController) {

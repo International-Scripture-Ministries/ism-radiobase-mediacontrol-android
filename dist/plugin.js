@@ -45,6 +45,9 @@ var capacitorMediaPlayer = (function (exports, core) {
         clearPlaylist() {
             return;
         }
+        getDuration(options) {
+            return Promise.resolve(options);
+        }
         getUpdate() {
             throw new Error('Method not implemented.');
         }
