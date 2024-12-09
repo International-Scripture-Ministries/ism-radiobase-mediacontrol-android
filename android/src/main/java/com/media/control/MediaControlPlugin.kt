@@ -43,7 +43,6 @@ import java.net.URL
 @CapacitorPlugin(name = "MediaControl")
 class MediaControlPlugin : Plugin() {
 
-//    private var seekUpdates = CoroutineScope(Dispatchers.Default + Job())
     private var seekUpdates: CoroutineScope? = null
 
     private val handler: Handler = Handler(Looper.getMainLooper())
@@ -58,6 +57,8 @@ class MediaControlPlugin : Plugin() {
 
     private var speedSet = true
     private var seekSet = true
+
+    private lateinit var call: PluginCall
 
     private var isPaused = false
     private var isLoaded = false
@@ -131,8 +132,9 @@ class MediaControlPlugin : Plugin() {
                     return
                 }
             } catch (e: Exception) {
-//                Log.e("Exception", e.toString())
-                call.reject(Const.ERROR)
+                val ret = JSObject()
+                ret.put("message", e.toString())
+                call.reject(Const.ERROR, ret)
             }
         }
     }
@@ -145,12 +147,22 @@ class MediaControlPlugin : Plugin() {
                 if (verifyAudio(mAudio)) {
                     Thread {
                         Handler(Looper.getMainLooper()).post {
+
+                            this.call = call
+
                             val mTitle = call.data.getString("title")?.takeIf { it != "NaN" } ?: ""
                             val mCover = call.data.getString("cover")?.takeIf { it != "NaN" } ?: ""
 
-                            mAudioData = AudioData(mAudio, mCover, mTitle, Const.DEFAUT_POS, playbackSpeed)
+                            playbackPos =
+                                call.data.getString("playbackPosition")?.takeIf { it != "NaN" }
+                                    ?: Const.DEFAUT_POS
+                            playbackSpeed =
+                                call.data.getString("playbackSpeed")?.takeIf { it != "NaN" }
+                                    ?: Const.DEFAUT_SPEED
+
+                            mAudioData =
+                                AudioData(mAudio, mCover, mTitle, playbackPos, playbackSpeed)
                             playOrLoadMediaItem(true)
-                            call.resolve()
                         }
                     }.start()
                 } else {
@@ -165,8 +177,9 @@ class MediaControlPlugin : Plugin() {
                     return
                 }
             } catch (e: Exception) {
-//                Log.e("Exception", e.toString())
-                call.reject(Const.ERROR)
+                val ret = JSObject()
+                ret.put("message", e.toString())
+                call.reject(Const.ERROR, ret)
             }
         }
     }
@@ -187,8 +200,9 @@ class MediaControlPlugin : Plugin() {
             }.start()
             call.resolve()
         } catch (e: Exception) {
-//            Log.e("Exception", e.toString())
-            call.reject(Const.ERROR)
+            val ret = JSObject()
+            ret.put("message", e.toString())
+            call.reject(Const.ERROR, ret)
         }
     }
 
@@ -212,8 +226,9 @@ class MediaControlPlugin : Plugin() {
             }.start()
             call.resolve()
         } catch (e: Exception) {
-//            Log.e("Exception", e.toString())
-            call.reject(Const.ERROR)
+            val ret = JSObject()
+            ret.put("message", e.toString())
+            call.reject(Const.ERROR, ret)
         }
     }
 
@@ -233,8 +248,9 @@ class MediaControlPlugin : Plugin() {
                 }
             }.start()
         } catch (e: Exception) {
-//            Log.e("Exception", e.toString())
-            call.reject(Const.ERROR)
+            val ret = JSObject()
+            ret.put("message", e.toString())
+            call.reject(Const.ERROR, ret)
         }
     }
 
@@ -245,7 +261,8 @@ class MediaControlPlugin : Plugin() {
                 Handler(Looper.getMainLooper()).post {
                     if (call.data.getJSONArray("audioArray").length() > 1) {
                         for (i in 0 until call.data.getJSONArray("audioArray").length()) {
-                            val mData: JSONObject = call.data.getJSONArray("audioArray").get(i) as JSONObject
+                            val mData: JSONObject =
+                                call.data.getJSONArray("audioArray").get(i) as JSONObject
                             if (mCurrentAudio.value != null) {
                                 if (!mCurrentAudio.value!!.url.contains(mData.getString("audio"))) {
                                     if (::controller.isInitialized) {
@@ -263,8 +280,9 @@ class MediaControlPlugin : Plugin() {
             }.start()
             call.resolve()
         } catch (e: Exception) {
-//            Log.e("Exception", e.toString())
-            call.reject(Const.ERROR)
+            val ret = JSObject()
+            ret.put("message", e.toString())
+            call.reject(Const.ERROR, ret)
         }
     }
 
@@ -285,8 +303,9 @@ class MediaControlPlugin : Plugin() {
                 }
             }.start()
         } catch (e: Exception) {
-//            Log.e("Exception", e.toString())
-            call.reject(Const.ERROR)
+            val ret = JSObject()
+            ret.put("message", e.toString())
+            call.reject(Const.ERROR, ret)
         }
     }
 
@@ -302,8 +321,9 @@ class MediaControlPlugin : Plugin() {
             }.start()
             call.resolve()
         } catch (e: Exception) {
-//            Log.e("Exception", e.toString())
-            call.reject(Const.ERROR)
+            val ret = JSObject()
+            ret.put("message", e.toString())
+            call.reject(Const.ERROR, ret)
         }
     }
 
@@ -319,8 +339,9 @@ class MediaControlPlugin : Plugin() {
             }.start()
             call.resolve()
         } catch (e: Exception) {
-//            Log.e("Exception", e.toString())
-            call.reject(Const.ERROR)
+            val ret = JSObject()
+            ret.put("message", e.toString())
+            call.reject(Const.ERROR, ret)
         }
     }
 
@@ -345,8 +366,9 @@ class MediaControlPlugin : Plugin() {
             }.start()
             call.resolve()
         } catch (e: Exception) {
-//            Log.e("Exception", e.toString())
-            call.reject(Const.ERROR)
+            val ret = JSObject()
+            ret.put("message", e.toString())
+            call.reject(Const.ERROR, ret)
         }
     }
 
@@ -368,8 +390,9 @@ class MediaControlPlugin : Plugin() {
             }
             call.resolve()
         } catch (e: Exception) {
-//            Log.e("Exception", e.toString())
-            call.reject(Const.ERROR)
+            val ret = JSObject()
+            ret.put("message", e.toString())
+            call.reject(Const.ERROR, ret)
         }
     }
 
@@ -393,8 +416,9 @@ class MediaControlPlugin : Plugin() {
             }.start()
             call.resolve()
         } catch (e: Exception) {
-//            Log.e("Exception", e.toString())
-            call.reject(Const.ERROR)
+            val ret = JSObject()
+            ret.put("message", e.toString())
+            call.reject(Const.ERROR, ret)
         }
     }
 
@@ -409,8 +433,9 @@ class MediaControlPlugin : Plugin() {
                 }
             }.start()
         } catch (e: Exception) {
-//            Log.e("Exception", e.toString())
-            call.reject(Const.ERROR)
+            val ret = JSObject()
+            ret.put("message", e.toString())
+            call.reject(Const.ERROR, ret)
         }
     }
 
@@ -429,8 +454,9 @@ class MediaControlPlugin : Plugin() {
                 }
             }.start()
         } catch (e: Exception) {
-//            Log.e("Exception", e.toString())
-            call.reject(Const.ERROR)
+            val ret = JSObject()
+            ret.put("message", e.toString())
+            call.reject(Const.ERROR, ret)
         }
     }
 
@@ -471,8 +497,7 @@ class MediaControlPlugin : Plugin() {
         }
     }
 
-    private fun
-            notifyListeners() {
+    private fun notifyListeners() {
         val ret = JSObject()
         ret.put("state", mPlayerState.value.toString())
         ret.put("position", mCurrentAudio.value!!.position)
@@ -566,6 +591,11 @@ class MediaControlPlugin : Plugin() {
     private fun loadMedia() {
         controller.setMediaItem(mediaBuilder())
         isLoaded = true
+
+        val ret = JSObject()
+        ret.put("value", isLoaded)
+        ret.put("url", mAudioData.url)
+        call.resolve(ret)
     }
 
     private fun stopMedia() {
