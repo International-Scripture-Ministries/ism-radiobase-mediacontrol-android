@@ -215,17 +215,7 @@ class MediaControlPlugin : Plugin() {
         try {
             Thread {
                 Handler(Looper.getMainLooper()).post {
-                    if (::controller.isInitialized) {
-                        if (controller.hasNextMediaItem()) {
-                            if (controller.currentMediaItemIndex == 0) {
-                                controller.removeMediaItems(1, controller.mediaItemCount)
-                            } else {
-                                controller.replaceMediaItem(0, controller.currentMediaItem!!)
-                                controller.seekTo(0, controller.currentPosition)
-                                controller.removeMediaItems(1, controller.mediaItemCount)
-                            }
-                        }
-                    }
+                    clearPlaylist()
                 }
             }.start()
             call.resolve()
@@ -244,9 +234,9 @@ class MediaControlPlugin : Plugin() {
                 Handler(Looper.getMainLooper()).post {
                     mDBHelper = DBHelper(context)
 
-                    clearPlaylist(call)
                     val gson = Gson()
                     ret.put("result", gson.toJson(mDBHelper.allAudios))
+                    clearPlaylist()
                     mDBHelper.deleteAllAudio()
                     call.resolve(ret)
                 }
@@ -650,6 +640,20 @@ class MediaControlPlugin : Plugin() {
             if (!mDBHelper.audioExist(mCurrentAudio.value!!.uuid)) {
                 mCurrentAudio.value!!.state = Const.COMPLETE
                 mDBHelper.insertAudio(mCurrentAudio.value)
+            }
+        }
+    }
+
+    private fun clearPlaylist() {
+        if (::controller.isInitialized) {
+            if (controller.hasNextMediaItem()) {
+                if (controller.currentMediaItemIndex == 0) {
+                    controller.removeMediaItems(1, controller.mediaItemCount)
+                } else {
+                    controller.replaceMediaItem(0, controller.currentMediaItem!!)
+                    controller.seekTo(0, controller.currentPosition)
+                    controller.removeMediaItems(1, controller.mediaItemCount)
+                }
             }
         }
     }
