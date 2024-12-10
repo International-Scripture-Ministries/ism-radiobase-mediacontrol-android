@@ -151,6 +151,9 @@ class MediaControlPlugin : Plugin() {
                 if (verifyAudio(mAudio)) {
                     Thread {
                         Handler(Looper.getMainLooper()).post {
+                            if (isLoaded) {
+                                stopMedia()
+                            }
 
                             this.call = call
 
@@ -517,8 +520,8 @@ class MediaControlPlugin : Plugin() {
     private fun notifyListeners() {
         val ret = JSObject()
         ret.put("state", mPlayerState.value.toString())
-        ret.put("position", mCurrentAudio.value!!.position)
-        ret.put("duration", mCurrentAudio.value!!.duration)
+        ret.put("position", controller.currentPosition.toString())
+        ret.put("duration", controller.duration.toString())
         ret.put("url", mCurrentAudio.value!!.url)
         notifyListeners("playerUpdates", ret)
     }
