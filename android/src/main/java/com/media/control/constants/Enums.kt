@@ -19,7 +19,7 @@ class Enums {
                 commandButton = CommandButton.Builder()
                     .setDisplayName("Rewind")
                     .setSessionCommand(SessionCommand(CUSTOM_COMMAND_REWIND_ACTION_ID, Bundle()))
-                    .setIconResId(R.drawable.ic_skip_backward)
+                    .setIconResId(R.drawable.backward)
                     .build(),
             ),
             FORWARD(
@@ -27,7 +27,7 @@ class Enums {
                 commandButton = CommandButton.Builder()
                     .setDisplayName("Forward")
                     .setSessionCommand(SessionCommand(CUSTOM_COMMAND_FORWARD_ACTION_ID, Bundle()))
-                    .setIconResId(R.drawable.ic_skip_forward)
+                    .setIconResId(R.drawable.forward)
                     .build(),
             );
         }

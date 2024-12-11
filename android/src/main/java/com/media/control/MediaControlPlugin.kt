@@ -518,12 +518,16 @@ class MediaControlPlugin : Plugin() {
     }
 
     private fun notifyListeners() {
-        val ret = JSObject()
-        ret.put("state", mPlayerState.value.toString())
-        ret.put("position", controller.currentPosition.toString())
-        ret.put("duration", controller.duration.toString())
-        ret.put("url", mCurrentAudio.value!!.url)
-        notifyListeners("playerUpdates", ret)
+        Thread {
+            Handler(Looper.getMainLooper()).post {
+                val ret = JSObject()
+                ret.put("state", mPlayerState.value.toString())
+                ret.put("position", controller.currentPosition.toString())
+                ret.put("duration", controller.duration.toString())
+                ret.put("url", mCurrentAudio.value!!.url)
+                notifyListeners("playerUpdates", ret)
+            }
+        }.start()
     }
 
     private fun verifyAudio(audio: String): Boolean {
@@ -723,7 +727,17 @@ class MediaControlPlugin : Plugin() {
                 } else {
                     if (player.value!!.playbackState == Player.STATE_ENDED) {
                         mPlayerState.value = Const.END
-                        notifyListeners() // Notify when media ended
+//                        notifyListeners() // Notify when media ended
+                        Thread {
+                            Handler(Looper.getMainLooper()).post {
+                                val ret = JSObject()
+                                ret.put("state", "END")
+                                ret.put("position", controller.currentPosition.toString())
+                                ret.put("duration", controller.duration.toString())
+                                ret.put("url", mCurrentAudio.value!!.url)
+                                notifyListeners("playerUpdates", ret)
+                            }
+                        }.start()
                         stopMedia()
                     }
                 }
