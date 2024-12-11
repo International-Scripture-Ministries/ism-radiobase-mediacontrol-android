@@ -76,8 +76,8 @@ class MediaControlPlugin : Plugin() {
         mDBHelper = DBHelper(context)
         mAppBackground.value = false
         if (mCurrentAudio.value != null) {
-            if (mCurrentAudio.value!!.uuid != "") {
-                if (!mDBHelper.audioExist(mCurrentAudio.value!!.uuid)) {
+            if (mCurrentAudio.value!!.url != "") {
+                if (!mDBHelper.audioExist(mCurrentAudio.value!!.url)) {
                     mDBHelper.insertAudio(mCurrentAudio.value)
                 }
             }
@@ -198,9 +198,7 @@ class MediaControlPlugin : Plugin() {
                 Handler(Looper.getMainLooper()).post {
                     if (::controller.isInitialized) {
                         if (!controller.isPlaying && !isPaused && isLoaded) {
-                            controller.prepare()
-                            controller.play()
-                            startNotifyingPlayerUpdates()
+                            playMedia() // PlayLoaded callback
                         }
                     }
                 }
@@ -487,7 +485,7 @@ class MediaControlPlugin : Plugin() {
                     val tsLong = System.currentTimeMillis() / 1000
                     mCurrentAudio.value = ResponseData(
                         mAudioData.url.split("/")[mAudioData.url.split("/").lastIndex],
-                        mAudioData.url,
+                        controller.currentMediaItem!!.mediaId,
                         Const.INCOMPLETE,
                         controller.duration.toString(),
                         controller.currentPosition.toString(),
@@ -587,7 +585,8 @@ class MediaControlPlugin : Plugin() {
                     if (loadItem) {
                         loadMedia()
                     } else {
-                        playMedia()
+                        controller.setMediaItem(mediaBuilder())
+                        playMedia() // Play if IDLE or ENDED
                     }
                 } else if (controller.playbackState == Player.STATE_READY || controller.playbackState == Player.STATE_BUFFERING) {
                     if (controller.playWhenReady) {
@@ -596,7 +595,8 @@ class MediaControlPlugin : Plugin() {
                             if (loadItem) {
                                 loadMedia()
                             } else {
-                                playMedia()
+                                controller.setMediaItem(mediaBuilder())
+                                playMedia() // Play if READY OR BUFFERING
                             }
                         }
                     }
@@ -606,7 +606,6 @@ class MediaControlPlugin : Plugin() {
     }
 
     private fun playMedia() {
-        controller.setMediaItem(mediaBuilder())
         controller.prepare()
         controller.play()
         startNotifyingPlayerUpdates()
@@ -644,7 +643,7 @@ class MediaControlPlugin : Plugin() {
 
     private fun audioCompleted() {
         if (mAppBackground.value!!) {
-            if (!mDBHelper.audioExist(mCurrentAudio.value!!.uuid)) {
+            if (!mDBHelper.audioExist(mCurrentAudio.value!!.url)) {
                 mCurrentAudio.value!!.state = Const.COMPLETE
                 mDBHelper.insertAudio(mCurrentAudio.value)
             }
@@ -727,7 +726,6 @@ class MediaControlPlugin : Plugin() {
                 } else {
                     if (player.value!!.playbackState == Player.STATE_ENDED) {
                         mPlayerState.value = Const.END
-//                        notifyListeners() // Notify when media ended
                         Thread {
                             Handler(Looper.getMainLooper()).post {
                                 val ret = JSObject()
@@ -735,7 +733,7 @@ class MediaControlPlugin : Plugin() {
                                 ret.put("position", controller.currentPosition.toString())
                                 ret.put("duration", controller.duration.toString())
                                 ret.put("url", mCurrentAudio.value!!.url)
-                                notifyListeners("playerUpdates", ret)
+                                notifyListeners("playerUpdates", ret)  // Notify when media ended
                             }
                         }.start()
                         stopMedia()
@@ -779,7 +777,7 @@ class MediaControlPlugin : Plugin() {
         seekUpdates?.launch {
             while (true) {
                 if (!isPaused) {
-                    notifyListeners()
+                    notifyListeners() // Loop started to notify Ionic callback
                 }
                 delay(Const.NOTIFY_SPEED)
             }

@@ -93,9 +93,9 @@ public class DBHelper extends SQLiteOpenHelper {
         return true;
     }
 
-    public boolean audioExist(String uuid) {
+    public boolean audioExist(String url) {
         SQLiteDatabase db = this.getWritableDatabase();
-        Cursor cursor = db.rawQuery("Select * from " + TABLE_AUDIO + " WHERE " + UUID + "=?", new String[]{uuid});
+        Cursor cursor = db.rawQuery("Select * from " + TABLE_AUDIO + " WHERE " + URL + "=?", new String[]{url});
         if (cursor.getCount() <= 0) {
             cursor.close();
             db.close();
