@@ -64,6 +64,7 @@ class MediaControlPlugin : Plugin() {
 
     private var isPaused = false
     private var isLoaded = false
+    private var isEnded = false
 
     private lateinit var mDBHelper: DBHelper
 
@@ -485,7 +486,7 @@ class MediaControlPlugin : Plugin() {
                     val tsLong = System.currentTimeMillis() / 1000
                     mCurrentAudio.value = ResponseData(
                         mAudioData.url.split("/")[mAudioData.url.split("/").lastIndex],
-                        controller.currentMediaItem!!.mediaId,
+                        mAudioData.url,
                         Const.INCOMPLETE,
                         controller.duration.toString(),
                         controller.currentPosition.toString(),
@@ -523,7 +524,9 @@ class MediaControlPlugin : Plugin() {
                 ret.put("position", controller.currentPosition.toString())
                 ret.put("duration", controller.duration.toString())
                 ret.put("url", mCurrentAudio.value!!.url)
-                notifyListeners("playerUpdates", ret)
+                if (!isEnded) {
+                  notifyListeners("playerUpdates", ret)
+                }
             }
         }.start()
     }
@@ -632,6 +635,7 @@ class MediaControlPlugin : Plugin() {
 
         isPaused = false
         isLoaded = false
+        isEnded = false
 
         mCurrentAudio.value!!.url = ""
 
@@ -733,7 +737,10 @@ class MediaControlPlugin : Plugin() {
                                 ret.put("position", controller.currentPosition.toString())
                                 ret.put("duration", controller.duration.toString())
                                 ret.put("url", mCurrentAudio.value!!.url)
-                                notifyListeners("playerUpdates", ret)  // Notify when media ended
+                                if (!isEnded) {
+                                  notifyListeners("playerUpdates", ret)  // Notify when media ended
+                                  isEnded = true
+                                }
                             }
                         }.start()
                         stopMedia()
@@ -754,13 +761,16 @@ class MediaControlPlugin : Plugin() {
             override fun onTracksChanged(tracks: Tracks) {
                 super.onTracksChanged(tracks)
                 if (controller.playbackState != Player.STATE_IDLE) {
-                    mAudioData = AudioData(
-                        controller.currentMediaItem!!.mediaId,
-                        controller.mediaMetadata.artworkUri.toString(),
-                        controller.mediaMetadata.title.toString(),
-                        playbackPos,
-                        playbackSpeed
-                    )
+                    if (controller.currentMediaItem!!.mediaId.isNotEmpty()) {
+                        mAudioData = AudioData(
+                            controller.currentMediaItem!!.mediaId,
+                            controller.mediaMetadata.artworkUri.toString(),
+                            controller.mediaMetadata.title.toString(),
+                            playbackPos,
+                            playbackSpeed
+                        )
+                        isEnded = false
+                    }
                 }
 
             }
