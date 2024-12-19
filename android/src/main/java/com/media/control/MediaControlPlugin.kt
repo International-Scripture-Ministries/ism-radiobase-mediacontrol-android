@@ -39,6 +39,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.json.JSONObject
+import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
 
@@ -179,7 +180,7 @@ class MediaControlPlugin : Plugin() {
                     mainHandler.post {
                         isLoaded = false
                         ret.put("message", "Audio Error")
-                        ret.put("url", audio)
+                        ret.put("url", mAudio)
                         call.reject(Const.ERROR, ret)
                     }
                     return
@@ -532,16 +533,22 @@ class MediaControlPlugin : Plugin() {
     }
 
     private fun verifyAudio(audio: String): Boolean {
-        if (audio.contains("http")) {
-            val url = URL(audio)
-            val connection = url.openConnection() as HttpURLConnection
-            connection.requestMethod = "GET"
-            connection.connect()
-            val code = connection.responseCode
-            return code == 200
-        } else {
-            return false
+      return if (audio.contains("http")) {
+        try {
+          val url = URL(audio)
+          val connection = url.openConnection() as HttpURLConnection
+          connection.requestMethod = "GET"
+          connection.connect()
+          val code = connection.responseCode
+          code == 200
+        } catch (e: Exception) {
+          e.printStackTrace()
+          false
         }
+      } else {
+        val file = File(audio)
+        file.exists() && file.isFile
+      }
     }
 
     private fun mediaBuilder(): MediaItem {
