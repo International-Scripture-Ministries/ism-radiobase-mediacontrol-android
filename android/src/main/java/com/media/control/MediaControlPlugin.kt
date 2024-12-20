@@ -425,7 +425,11 @@ class MediaControlPlugin : Plugin() {
             val ret = JSObject()
             Thread {
                 Handler(Looper.getMainLooper()).post {
-                    ret.put("value", mPlayerState.value)
+                    if (::controller.isInitialized) {
+						ret.put("value", controller.isPlaying)
+					} else {
+						ret.put("value", false)
+					}
                     call.resolve(ret)
                 }
             }.start()
