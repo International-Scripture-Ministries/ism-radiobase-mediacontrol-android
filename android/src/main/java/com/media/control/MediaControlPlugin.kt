@@ -489,14 +489,19 @@ class MediaControlPlugin : Plugin() {
             try {
                 Handler().postDelayed({
                     val tsLong = System.currentTimeMillis() / 1000
-                    mCurrentAudio.value = ResponseData(
-                        mAudioData.url.split("/")[mAudioData.url.split("/").lastIndex],
-                        mAudioData.url,
+
+                  if (::controller.isInitialized) {
+                    controller.currentMediaItem?.let {
+                      mCurrentAudio.value = ResponseData(
+                        it.mediaId.split("/")[it.mediaId.split("/").lastIndex],
+                        it.mediaId,
                         Const.INCOMPLETE,
                         controller.duration.toString(),
                         controller.currentPosition.toString(),
                         tsLong.toString()
-                    )
+                      )
+                    }
+                  }
                 }, Const.UPDATE_SPEED)
             } catch (e: Exception) {
 //                Log.d(TAG, e.toString())
@@ -526,10 +531,12 @@ class MediaControlPlugin : Plugin() {
             Handler(Looper.getMainLooper()).post {
                 val ret = JSObject()
                 if (::controller.isInitialized) {
-                  ret.put("state", mPlayerState.value.toString())
-                  ret.put("position", controller.currentPosition.toString())
-                  ret.put("duration", controller.duration.toString())
-                  ret.put("url", controller.currentMediaItem!!.mediaId)
+                  controller.currentMediaItem?.let {
+                    ret.put("state", mPlayerState.value.toString())
+                    ret.put("position", controller.currentPosition.toString())
+                    ret.put("duration", controller.duration.toString())
+                    ret.put("url", it.mediaId)
+                  }
                   if (!isEnded) {
                     notifyListeners("playerUpdates", ret)
                   }
