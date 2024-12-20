@@ -424,14 +424,14 @@ class MediaControlPlugin : Plugin() {
         try {
             val ret = JSObject()
             Thread {
-                Handler(Looper.getMainLooper()).post {
-                    if (::controller.isInitialized) {
-						ret.put("value", controller.isPlaying)
-					} else {
-						ret.put("value", false)
-					}
-                    call.resolve(ret)
+              Handler(Looper.getMainLooper()).post {
+                if (::controller.isInitialized) {
+                  ret.put("value", controller.isPlaying)
+                } else {
+                  ret.put("value", false)
                 }
+                call.resolve(ret)
+              }
             }.start()
         } catch (e: Exception) {
             val ret = JSObject()
@@ -525,12 +525,14 @@ class MediaControlPlugin : Plugin() {
         Thread {
             Handler(Looper.getMainLooper()).post {
                 val ret = JSObject()
-                ret.put("state", mPlayerState.value.toString())
-                ret.put("position", controller.currentPosition.toString())
-                ret.put("duration", controller.duration.toString())
-                ret.put("url", mCurrentAudio.value!!.url)
-                if (!isEnded) {
-                  notifyListeners("playerUpdates", ret)
+                if (::controller.isInitialized) {
+                  ret.put("state", mPlayerState.value.toString())
+                  ret.put("position", controller.currentPosition.toString())
+                  ret.put("duration", controller.duration.toString())
+                  ret.put("url", controller.currentMediaItem!!.mediaId)
+                  if (!isEnded) {
+                    notifyListeners("playerUpdates", ret)
+                  }
                 }
             }
         }.start()
