@@ -7,6 +7,7 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import androidx.core.net.toUri
+import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
@@ -60,6 +61,7 @@ class MediaControlPlugin : Plugin() {
 
     private var speedSet = true
     private var seekSet = true
+    private var volSet = true
 
     private lateinit var call: PluginCall
 
@@ -492,6 +494,14 @@ class MediaControlPlugin : Plugin() {
 
                   if (::controller.isInitialized) {
                     controller.currentMediaItem?.let {
+                      if (controller.currentPosition > 500L) {
+                        if (volSet) {
+                          volSet = false
+                          controller.setDeviceMuted(false, C.VOLUME_FLAG_SHOW_UI)
+                        }
+                      } else {
+                        controller.setDeviceMuted(true, C.VOLUME_FLAG_SHOW_UI)
+                      }
                       mCurrentAudio.value = ResponseData(
                         it.mediaId.split("/")[it.mediaId.split("/").lastIndex],
                         it.mediaId,
@@ -652,6 +662,7 @@ class MediaControlPlugin : Plugin() {
 
         speedSet = true
         seekSet = true
+        volSet = true
 
         isPaused = false
         isLoaded = false
