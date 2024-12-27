@@ -33,8 +33,8 @@ export class MediaControlWeb extends WebPlugin {
     add(audioArray) {
         return audioArray;
     }
-    fetchPlaylist() {
-        throw new Error('Method not implemented.');
+    fetchPlaylist(options) {
+        return options;
     }
     clearPlaylist() {
         return;

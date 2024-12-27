@@ -31,9 +31,9 @@ export declare class MediaControlWeb extends WebPlugin implements MediaControlPl
         value: string;
     }): any;
     add(audioArray: JSON[]): any;
-    fetchPlaylist(): Promise<{
-        result: JSON;
-    }>;
+    fetchPlaylist(options: {
+        completed: string;
+    }): any;
     clearPlaylist(): void;
     getDuration(options: {
         audio: string;

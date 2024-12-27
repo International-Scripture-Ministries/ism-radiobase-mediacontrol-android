@@ -237,10 +237,16 @@ class MediaControlPlugin : Plugin() {
             val ret = JSObject()
             Thread {
                 Handler(Looper.getMainLooper()).post {
-                    mDBHelper = DBHelper(context)
-
                     val gson = Gson()
-                    ret.put("result", gson.toJson(mDBHelper.allAudios))
+
+                    val isComp = call.data.getString("completed")?.takeIf { it != "NaN" } ?: "true"
+                    if (isComp == "false") {
+                        ret.put("result", gson.toJson(mCurrentAudio.value))
+                    } else {
+                        mDBHelper = DBHelper(context)
+                        ret.put("result", gson.toJson(mDBHelper.allAudios))
+                    }
+
                     clearPlaylist()
                     mDBHelper.deleteAllAudio()
                     call.resolve(ret)
@@ -497,10 +503,10 @@ class MediaControlPlugin : Plugin() {
                       if (controller.currentPosition > 500L) {
                         if (volSet) {
                           volSet = false
-                          controller.setDeviceMuted(false, C.VOLUME_FLAG_SHOW_UI)
+                          controller.volume = 1F
                         }
                       } else {
-                        controller.setDeviceMuted(true, C.VOLUME_FLAG_SHOW_UI)
+                          controller.volume = 0F
                       }
                       mCurrentAudio.value = ResponseData(
                         it.mediaId.split("/")[it.mediaId.split("/").lastIndex],
@@ -641,6 +647,7 @@ class MediaControlPlugin : Plugin() {
     private fun playMedia() {
         controller.prepare()
         controller.play()
+        controller.volume = 0F
         startNotifyingPlayerUpdates()
     }
 

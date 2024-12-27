@@ -48,8 +48,8 @@ export class MediaControlWeb extends WebPlugin implements MediaControlPlugin {
         return audioArray
     }
 
-    fetchPlaylist(): Promise<{result: JSON;}> {
-        throw new Error('Method not implemented.');
+    fetchPlaylist(options: { completed: string; }): any {
+        return options
     }
 
     clearPlaylist(): void {

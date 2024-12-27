@@ -202,8 +202,11 @@ export interface MediaControlPlugin {
      * Retrieves a JSON array of all audios played in background along with following params.
      * [Note: Once the fetchPlaylist() is called
      *
+     * @param {string} options.completed - String type of true/false which either send entire list in result or just the last INCOMPLETE audio.
+     *
      * @example
-     * player.fetchPlaylist(success => {
+     * player.fetchPlaylist({ completed: 'true' },
+     *                      success => {
      *                         console.log(success);
      *                     }, error => {
      *                         console.log(error);
@@ -216,8 +219,16 @@ export interface MediaControlPlugin {
      * @param {String} `state`: The state of an audio which is listened completed or not  (e.g. "COMPLETE", "INCOMPLETE").
      * @param {String} `url`: The URL of an audio.
      */
-    fetchPlaylist(): Promise<{
+    fetchPlaylist(options: {
+        completed: string;
+    }): Promise<{
         result: JSON;
+    }>;
+    getDuration(options: {
+        audio: string;
+    }): Promise<{
+        url: string;
+        duration: boolean;
     }>;
     /**
      * Clears the playlist of audios that were added using add() function.
