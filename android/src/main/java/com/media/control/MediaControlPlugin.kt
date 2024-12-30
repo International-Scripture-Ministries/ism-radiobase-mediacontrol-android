@@ -498,7 +498,7 @@ class MediaControlPlugin : Plugin() {
     private val playerPosition: Runnable = object : Runnable {
         override fun run() {
             try {
-                Log.d("currentPosition", controller.currentPosition.toString())
+//                Log.d("currentPosition", controller.currentPosition.toString())
                 Handler(Looper.getMainLooper()).postDelayed({
                     val tsLong = System.currentTimeMillis() / 1000
 
@@ -749,11 +749,11 @@ class MediaControlPlugin : Plugin() {
                     Player.STATE_BUFFERING -> {
                         // Log or monitor buffering progress
                         val bufferedPercentage = controller.bufferedPercentage
-                        Log.d("ExoPlayer", "Buffered: $bufferedPercentage%")
+//                        Log.d("ExoPlayer", "Buffered: $bufferedPercentage%")
 
                         // Check if the audio is fully buffered
                         if (bufferedPercentage == 100) {
-                            Log.d("ExoPlayer", "Fully buffered. Starting playback.")
+//                            Log.d("ExoPlayer", "Fully buffered. Starting playback.")
                             controller.playWhenReady = true
                         }
 //                        Log.d(TAG, "STATE_BUFFERING")
