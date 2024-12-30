@@ -53,6 +53,8 @@ class MediaControlPlugin : Plugin() {
 
     private lateinit var mAudioData: AudioData
 
+    private var completed = true
+
     private lateinit var title: String
     private lateinit var cover: String
     private lateinit var audio: String
@@ -202,6 +204,7 @@ class MediaControlPlugin : Plugin() {
                 Handler(Looper.getMainLooper()).post {
                     if (::controller.isInitialized) {
                         if (!controller.isPlaying && !isPaused && isLoaded) {
+                            volSet = true
                             playMedia() // PlayLoaded callback
                         }
                     }
@@ -432,14 +435,14 @@ class MediaControlPlugin : Plugin() {
         try {
             val ret = JSObject()
             Thread {
-              Handler(Looper.getMainLooper()).post {
-                if (::controller.isInitialized) {
-                  ret.put("value", controller.isPlaying)
-                } else {
-                  ret.put("value", false)
+                Handler(Looper.getMainLooper()).post {
+                    if (::controller.isInitialized) {
+                        ret.put("value", controller.isPlaying)
+                    } else {
+                        ret.put("value", false)
+                    }
+                    call.resolve(ret)
                 }
-                call.resolve(ret)
-              }
             }.start()
         } catch (e: Exception) {
             val ret = JSObject()
@@ -495,29 +498,31 @@ class MediaControlPlugin : Plugin() {
     private val playerPosition: Runnable = object : Runnable {
         override fun run() {
             try {
-                Handler().postDelayed({
+                Log.d("currentPosition", controller.currentPosition.toString())
+                Handler(Looper.getMainLooper()).postDelayed({
                     val tsLong = System.currentTimeMillis() / 1000
 
-                  if (::controller.isInitialized) {
-                    controller.currentMediaItem?.let {
-                      if (controller.currentPosition > 500L) {
-                        if (volSet) {
-                          volSet = false
-                          controller.volume = 1F
+                    if (::controller.isInitialized) {
+                        controller.currentMediaItem?.let {
+                            if (controller.currentPosition > 1000L) {
+                                if (volSet) {
+                                    volSet = false
+                                    controller.seekTo(0)
+                                    controller.volume = 1F
+                                }
+                            }/* else {
+                                controller.volume = 0F
+                            }*/
+                            mCurrentAudio.value = ResponseData(
+                                it.mediaId.split("/")[it.mediaId.split("/").lastIndex],
+                                it.mediaId,
+                                Const.INCOMPLETE,
+                                controller.duration.toString(),
+                                controller.currentPosition.toString(),
+                                tsLong.toString()
+                            )
                         }
-                      } else {
-                          controller.volume = 0F
-                      }
-                      mCurrentAudio.value = ResponseData(
-                        it.mediaId.split("/")[it.mediaId.split("/").lastIndex],
-                        it.mediaId,
-                        Const.INCOMPLETE,
-                        controller.duration.toString(),
-                        controller.currentPosition.toString(),
-                        tsLong.toString()
-                      )
                     }
-                  }
                 }, Const.UPDATE_SPEED)
             } catch (e: Exception) {
 //                Log.d(TAG, e.toString())
@@ -547,37 +552,37 @@ class MediaControlPlugin : Plugin() {
             Handler(Looper.getMainLooper()).post {
                 val ret = JSObject()
                 if (::controller.isInitialized) {
-                  controller.currentMediaItem?.let {
-                    ret.put("state", mPlayerState.value.toString())
-                    ret.put("position", controller.currentPosition.toString())
-                    ret.put("duration", controller.duration.toString())
-                    ret.put("url", it.mediaId)
-                  }
-                  if (!isEnded) {
-                    notifyListeners("playerUpdates", ret)
-                  }
+                    controller.currentMediaItem?.let {
+                        ret.put("state", mPlayerState.value.toString())
+                        ret.put("position", controller.currentPosition.toString())
+                        ret.put("duration", controller.duration.toString())
+                        ret.put("url", it.mediaId)
+                    }
+                    if (!isEnded) {
+                        notifyListeners("playerUpdates", ret)
+                    }
                 }
             }
         }.start()
     }
 
     private fun verifyAudio(audio: String): Boolean {
-      return if (audio.contains("http")) {
-        try {
-          val url = URL(audio)
-          val connection = url.openConnection() as HttpURLConnection
-          connection.requestMethod = "GET"
-          connection.connect()
-          val code = connection.responseCode
-          code == 200
-        } catch (e: Exception) {
-          e.printStackTrace()
-          false
+        return if (audio.contains("http")) {
+            try {
+                val url = URL(audio)
+                val connection = url.openConnection() as HttpURLConnection
+                connection.requestMethod = "GET"
+                connection.connect()
+                val code = connection.responseCode
+                code == 200
+            } catch (e: Exception) {
+                e.printStackTrace()
+                false
+            }
+        } else {
+            val file = File(audio)
+            file.exists() && file.isFile
         }
-      } else {
-        val file = File(audio)
-        file.exists() && file.isFile
-      }
     }
 
     private fun mediaBuilder(): MediaItem {
@@ -742,6 +747,15 @@ class MediaControlPlugin : Plugin() {
             override fun onPlaybackStateChanged(playbackState: Int) {
                 when (playbackState) {
                     Player.STATE_BUFFERING -> {
+                        // Log or monitor buffering progress
+                        val bufferedPercentage = controller.bufferedPercentage
+                        Log.d("ExoPlayer", "Buffered: $bufferedPercentage%")
+
+                        // Check if the audio is fully buffered
+                        if (bufferedPercentage == 100) {
+                            Log.d("ExoPlayer", "Fully buffered. Starting playback.")
+                            controller.playWhenReady = true
+                        }
 //                        Log.d(TAG, "STATE_BUFFERING")
                     }
 
@@ -776,8 +790,11 @@ class MediaControlPlugin : Plugin() {
                                 ret.put("duration", controller.duration.toString())
                                 ret.put("url", mCurrentAudio.value!!.url)
                                 if (!isEnded) {
-                                  notifyListeners("playerUpdates", ret)  // Notify when media ended
-                                  isEnded = true
+                                    notifyListeners(
+                                        "playerUpdates",
+                                        ret
+                                    )  // Notify when media ended
+                                    isEnded = true
                                 }
                             }
                         }.start()
@@ -808,6 +825,7 @@ class MediaControlPlugin : Plugin() {
                             playbackSpeed
                         )
                         isEnded = false
+                        volSet = true
                     }
                 }
 

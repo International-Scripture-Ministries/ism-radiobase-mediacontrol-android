@@ -10,11 +10,13 @@ import android.media.AudioFocusRequest
 import android.media.AudioManager
 import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import androidx.core.app.TaskStackBuilder
 import androidx.lifecycle.MutableLiveData
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
@@ -176,9 +178,19 @@ class PlaybackService : MediaSessionService(), MediaSession.Callback {
         }
     }
 
+    @UnstableApi
     private fun initializeSessionAndPlayer() {
         if (playerInstance == null) {
-            playerInstance = ExoPlayer.Builder(this).build().also { it.addListener(playerListener) }
+            val loadControl = DefaultLoadControl.Builder()
+                .setBufferDurationsMs(
+                    30000, // Minimum buffer before playback
+                    Int.MAX_VALUE, // Allow buffering the entire media
+                    500, // Buffer required for playback start
+                    1000 // Buffer required after rebuffer
+                )
+                .build()
+            playerInstance = ExoPlayer.Builder(this)
+                .setLoadControl(loadControl).build().also { it.addListener(playerListener) }
         }
         player.value = playerInstance!!
         launcherIntent = initializeIntent()
@@ -238,6 +250,7 @@ class PlaybackService : MediaSessionService(), MediaSession.Callback {
         args: Bundle
     ): ListenableFuture<SessionResult> {
         /* Handling custom command buttons from player notification. */
+
         currentSongPosition = session.player.currentPosition
 
         if (player.value!!.playWhenReady)
