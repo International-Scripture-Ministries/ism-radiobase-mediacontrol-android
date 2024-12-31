@@ -85,6 +85,18 @@ class PlaybackService : MediaSessionService(), MediaSession.Callback {
     }
 
     private val playerListener = @UnstableApi object : Player.Listener {
+
+        override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+            super.onMediaItemTransition(mediaItem, reason)
+            playerInstance?.let {
+                if(!it.isPlaying) {
+                    it.volume = 0F
+                }
+                if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO) {
+                    it.volume = 0F
+                }
+            }
+        }
         override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
             super.onPlayWhenReadyChanged(playWhenReady, reason)
             if (playWhenReady)
@@ -178,19 +190,17 @@ class PlaybackService : MediaSessionService(), MediaSession.Callback {
         }
     }
 
-    @UnstableApi
     private fun initializeSessionAndPlayer() {
         if (playerInstance == null) {
-            val loadControl = DefaultLoadControl.Builder()
+            /*val loadControl = DefaultLoadControl.Builder()
                 .setBufferDurationsMs(
                     30000, // Minimum buffer before playback
                     Int.MAX_VALUE, // Allow buffering the entire media
                     500, // Buffer required for playback start
                     1000 // Buffer required after rebuffer
                 )
-                .build()
-            playerInstance = ExoPlayer.Builder(this)
-                .setLoadControl(loadControl).build().also { it.addListener(playerListener) }
+                .build()*/
+            playerInstance = ExoPlayer.Builder(this).build().also { it.addListener(playerListener) }
         }
         player.value = playerInstance!!
         launcherIntent = initializeIntent()

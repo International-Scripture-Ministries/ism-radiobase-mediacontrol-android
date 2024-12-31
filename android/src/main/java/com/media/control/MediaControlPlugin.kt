@@ -63,7 +63,7 @@ class MediaControlPlugin : Plugin() {
 
     private var speedSet = true
     private var seekSet = true
-    private var volSet = true
+//    private var volSet = true
 
     private lateinit var call: PluginCall
 
@@ -204,7 +204,7 @@ class MediaControlPlugin : Plugin() {
                 Handler(Looper.getMainLooper()).post {
                     if (::controller.isInitialized) {
                         if (!controller.isPlaying && !isPaused && isLoaded) {
-                            volSet = true
+//                            volSet = true
                             playMedia() // PlayLoaded callback
                         }
                     }
@@ -504,15 +504,20 @@ class MediaControlPlugin : Plugin() {
 
                     if (::controller.isInitialized) {
                         controller.currentMediaItem?.let {
-                            if (controller.currentPosition > 1000L) {
-                                if (volSet) {
-                                    volSet = false
+                            if (controller.currentPosition in 11..999) {
+                                if (player.value!!.volume == 0F) {
+//                                    volSet = false
                                     controller.seekTo(0)
                                     controller.volume = 1F
                                 }
-                            }/* else {
-                                controller.volume = 0F
-                            }*/
+                            }
+
+                            if (player.value!!.volume == 0F) {
+                                if (controller.currentPosition > 2000F) {
+                                    controller.volume = 1F
+                                }
+                            }
+
                             mCurrentAudio.value = ResponseData(
                                 it.mediaId.split("/")[it.mediaId.split("/").lastIndex],
                                 it.mediaId,
@@ -652,7 +657,6 @@ class MediaControlPlugin : Plugin() {
     private fun playMedia() {
         controller.prepare()
         controller.play()
-        controller.volume = 0F
         startNotifyingPlayerUpdates()
     }
 
@@ -674,7 +678,7 @@ class MediaControlPlugin : Plugin() {
 
         speedSet = true
         seekSet = true
-        volSet = true
+//        volSet = true
 
         isPaused = false
         isLoaded = false
@@ -825,7 +829,9 @@ class MediaControlPlugin : Plugin() {
                             playbackSpeed
                         )
                         isEnded = false
-                        volSet = true
+                        if (mAppBackground.value!!) {
+//                            volSet = true
+                        }
                     }
                 }
 
