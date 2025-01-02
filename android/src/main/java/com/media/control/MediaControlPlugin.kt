@@ -53,7 +53,6 @@ class MediaControlPlugin : Plugin() {
 
     private lateinit var mAudioData: AudioData
 
-    private var completed = true
 
     private lateinit var title: String
     private lateinit var cover: String
@@ -70,6 +69,7 @@ class MediaControlPlugin : Plugin() {
     private var isPaused = false
     private var isLoaded = false
     private var isEnded = false
+    private var isCompleted = false
 
     private lateinit var mDBHelper: DBHelper
 
@@ -695,8 +695,8 @@ class MediaControlPlugin : Plugin() {
     private fun audioCompleted() {
         if (mAppBackground.value!!) {
             if (!mDBHelper.audioExist(mCurrentAudio.value!!.url)) {
-                mCurrentAudio.value!!.state = Const.COMPLETE
                 mDBHelper.insertAudio(mCurrentAudio.value)
+                mCurrentAudio.value!!.state = Const.INCOMPLETE
             }
         }
     }
@@ -743,7 +743,12 @@ class MediaControlPlugin : Plugin() {
                 if (mAppBackground.value!!) {
                     val tempPos = controller.currentPosition.toInt() / 1000
                     if (tempPos == 0) {
+                      if (!isCompleted) {
+                        isCompleted = true
+                        mCurrentAudio.value!!.state = Const.COMPLETE
                         audioCompleted()
+                      }
+
                     }
                 }
             }
@@ -829,9 +834,7 @@ class MediaControlPlugin : Plugin() {
                             playbackSpeed
                         )
                         isEnded = false
-                        if (mAppBackground.value!!) {
-//                            volSet = true
-                        }
+                        triggerIsCompleted()
                     }
                 }
 
@@ -839,6 +842,14 @@ class MediaControlPlugin : Plugin() {
         })
 
         handler.post(playerPosition)
+      }
+
+    fun triggerIsCompleted() {
+      val scope = CoroutineScope(Dispatchers.Main + Job())
+      scope.launch(Dispatchers.Main) {
+        delay(2000)
+        isCompleted = false
+      }
     }
 
     private fun startNotifyingPlayerUpdates() {
