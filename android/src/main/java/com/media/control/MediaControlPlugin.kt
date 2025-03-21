@@ -236,7 +236,31 @@ class MediaControlPlugin : Plugin() {
 
     @PluginMethod
     fun fetchPlaylist(call: PluginCall) {
-        try {
+        fetchPlaylistAnd(call, true)
+    }
+
+     @PluginMethod
+    fun retrieveStoredProgress(call: PluginCall) {
+      fetchPlaylistAnd(call, false)
+    }
+
+    @PluginMethod
+    fun clearStoredProgress(call: PluginCall) {
+      try {
+        Thread {
+          Handler(Looper.getMainLooper()).post {
+            mDBHelper = DBHelper(context)
+            mDBHelper.deleteAllAudio()
+            Log.d("clearStoredProg", "clearedStoredProgress")
+          }
+        }.start()
+      } catch (e: Exception) {
+        Log.e("Exception", e.toString())
+      }
+    }
+
+    private fun fetchPlaylistAnd(call: PluginCall, clearState: Boolean) {
+    
             val ret = JSObject()
             Thread {
                 Handler(Looper.getMainLooper()).post {
@@ -249,18 +273,20 @@ class MediaControlPlugin : Plugin() {
                         mDBHelper = DBHelper(context)
                         ret.put("result", gson.toJson(mDBHelper.allAudios))
                     }
-
-                    clearPlaylist()
-                    mDBHelper.deleteAllAudio()
+                    if (clearState) {
+                        clearPlaylist()
+                        mDBHelper.deleteAllAudio()
+                    }
                     call.resolve(ret)
                 }
             }.start()
-        } catch (e: Exception) {
+        }  catch (e: Exception) {
             val ret = JSObject()
             ret.put("message", e.toString())
             call.reject(Const.ERROR, ret)
-        }
     }
+  }
+
 
     @PluginMethod
     fun add(call: PluginCall) {

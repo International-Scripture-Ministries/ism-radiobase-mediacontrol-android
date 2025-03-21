@@ -45,5 +45,11 @@ export class MediaControlWeb extends WebPlugin {
     getUpdate() {
         throw new Error('Method not implemented.');
     }
+    retrieveStoredProgress() {
+        throw new Error('Method not implemented.');
+    }
+    clearStoredProgress() {
+        throw new Error('Method not implemented.');
+    }
 }
 //# sourceMappingURL=web.js.map

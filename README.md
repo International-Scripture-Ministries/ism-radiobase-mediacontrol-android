@@ -310,6 +310,27 @@ player.getUpdate(success => {
 }
 ```
 
+### retrieveStoredProgress()
+
+```typescript
+retrieveStoredProgress() => Promise<{ result: JSON; }>
+```
+
+**Returns:** <code>Promise&lt;{ result: <a href="#json">JSON</a>; }&gt;</code>
+
+--------------------
+
+
+### clearStoredProgress()
+
+```typescript
+clearStoredProgress() => void
+```
+
+--------------------
+
+
+
 --------------------
 
 ### addListener(event, ...)

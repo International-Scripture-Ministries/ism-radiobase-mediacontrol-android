@@ -1,4 +1,4 @@
-import {WebPlugin} from '@capacitor/core';
+import { WebPlugin} from '@capacitor/core';
 
 import type {MediaControlPlugin} from './definitions';
 
@@ -61,6 +61,14 @@ export class MediaControlWeb extends WebPlugin implements MediaControlPlugin {
     }
 
     getUpdate(): Promise<{ state: string; position: string; duration: string; url: string }> {
+        throw new Error('Method not implemented.');
+    }
+
+    retrieveStoredProgress(): Promise<{result: JSON;}> {
+        throw new Error('Method not implemented.');
+    }
+
+    clearStoredProgress(): void {
         throw new Error('Method not implemented.');
     }
 

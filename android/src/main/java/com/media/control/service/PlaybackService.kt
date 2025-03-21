@@ -132,63 +132,28 @@ class PlaybackService : MediaSessionService(), MediaSession.Callback {
     private lateinit var mClass: Class<*>
 
     private fun initializeIntent(): PendingIntent {
-        val mContext = this
-        if (mContext != null) {
-            try {
-                val mainActivityClass = Class.forName(mContext.packageName + ".MainActivity")
-                mClass = mainActivityClass
-            } catch (e: ClassNotFoundException) {
-                mClass = javaClass
-            }
-
-            val resultIntent = Intent(this, mClass)
-            resultIntent.setAction(Intent.ACTION_MAIN)
-            resultIntent.addCategory(Intent.CATEGORY_LAUNCHER)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                val activityOptions = ActivityOptions.makeBasic()
-                    .setPendingIntentBackgroundActivityStartMode(
-                        ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED
-                    ).toBundle()
-                return PendingIntent.getActivity(
-                    this,
-                    0,
-                    resultIntent,
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) PendingIntent.FLAG_MUTABLE else PendingIntent.FLAG_IMMUTABLE,
-                    activityOptions
-                )
-            } else {
-                return PendingIntent.getActivity(
-                    this,
-                    0,
-                    resultIntent,
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) PendingIntent.FLAG_MUTABLE else PendingIntent.FLAG_IMMUTABLE
-                )
-            }
-
-        } else {
-            val intent = Intent(this, MainActivity::class.java)
-            intent.setFlags(Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED or Intent.FLAG_ACTIVITY_NEW_TASK)
-            val pendingIntent = TaskStackBuilder.create(this).run {
-                addNextIntent(intent)
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                    getPendingIntent(
-                        0,
-                        PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
-                        ActivityOptions.makeBasic()
-                            .setPendingIntentBackgroundActivityStartMode(
-                                ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED
-                            ).toBundle()
-                    )
-                } else {
-                    getPendingIntent(
-                        0,
-                        PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-                    )
-                }
-            }
-            return pendingIntent!!
-        }
+    val mContext = this
+    try {
+        val mainActivityClass = Class.forName(mContext.packageName + ".MainActivity")
+        mClass = mainActivityClass
+    } catch (e: ClassNotFoundException) {
+        mClass = javaClass
     }
+
+    val resultIntent = Intent(this, mClass).apply {
+        action = Intent.ACTION_MAIN
+        addCategory(Intent.CATEGORY_LAUNCHER)
+    }
+
+    // Remove setPendingIntentBackgroundActivityStartMode completely
+    return PendingIntent.getActivity(
+        this,
+        0,
+        resultIntent,
+        PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+    )
+}
+
 
     private fun initializeSessionAndPlayer() {
         if (playerInstance == null) {

@@ -274,6 +274,10 @@ export interface MediaControlPlugin {
         url: string;
         duration: boolean;
     }>;
+    retrieveStoredProgress(): Promise<{
+        result: JSON;
+    }>;
+    clearStoredProgress(): void;
     /**
      * Adds an event listener for player updates.
      *

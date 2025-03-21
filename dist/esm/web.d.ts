@@ -44,4 +44,8 @@ export declare class MediaControlWeb extends WebPlugin implements MediaControlPl
         duration: string;
         url: string;
     }>;
+    retrieveStoredProgress(): Promise<{
+        result: JSON;
+    }>;
+    clearStoredProgress(): void;
 }
