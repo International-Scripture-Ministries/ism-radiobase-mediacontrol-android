@@ -311,13 +311,8 @@ export interface MediaControlPlugin {
      * });
      */
     addListener(
-        eventName: 'playerUpdates',
-        listenerFunc: (data: {
-            state: string;
-            position: string;
-            duration: string;
-            url: string;
-        }) => void
-    ): PluginListenerHandle;
+        eventName: "playerUpdates",
+        listenerFunc: (data: { state: string; position: string; duration: string; url: string }) => void
+      ): Promise<PluginListenerHandle>;
 }
 

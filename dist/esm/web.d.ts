@@ -1,6 +1,12 @@
-import { WebPlugin } from '@capacitor/core';
+import { PluginListenerHandle, WebPlugin } from '@capacitor/core';
 import type { MediaControlPlugin } from './definitions';
 export declare class MediaControlWeb extends WebPlugin implements MediaControlPlugin {
+    addListener(eventName: "playerUpdates", callback: (data: {
+        state: string;
+        position: string;
+        duration: string;
+        url: string;
+    }) => void): Promise<PluginListenerHandle>;
     play(options: {
         audio: string;
         cover: string;
