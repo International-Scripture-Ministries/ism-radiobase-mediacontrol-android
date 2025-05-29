@@ -296,10 +296,10 @@ export interface MediaControlPlugin {
      *   console.log('Received data:', data);
      * });
      */
-    addListener(eventName: 'playerUpdates', listenerFunc: (data: {
+    addListener(eventName: "playerUpdates", listenerFunc: (data: {
         state: string;
         position: string;
         duration: string;
         url: string;
-    }) => void): PluginListenerHandle;
+    }) => void): Promise<PluginListenerHandle>;
 }

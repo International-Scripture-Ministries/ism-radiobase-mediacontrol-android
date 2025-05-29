@@ -1,4 +1,4 @@
-import type {PluginListenerHandle} from '@capacitor/core';
+import type { PluginListenerHandle } from '@capacitor/core';
 
 export interface MediaControlPlugin {
 
@@ -294,7 +294,7 @@ export interface MediaControlPlugin {
 
     retrieveStoredProgress(): Promise<{
         result: JSON;
-	}>;
+    }>;
 
     clearStoredProgress(): void;
 
@@ -317,14 +317,8 @@ export interface MediaControlPlugin {
      * });
      */
     addListener(
-        eventName: 'playerUpdates',
-        listenerFunc: (data: {
-            state: string;
-            position: string;
-            duration: string;
-            url: string;
-        }) => void
-    ): PluginListenerHandle;
-
+        eventName: "playerUpdates",
+        listenerFunc: (data: { state: string; position: string; duration: string; url: string }) => void
+    ): Promise<PluginListenerHandle>;
 }
 
