@@ -51,6 +51,12 @@ var capacitorMediaPlayer = (function (exports, core) {
         getUpdate() {
             throw new Error('Method not implemented.');
         }
+        retrieveStoredProgress() {
+            throw new Error('Method not implemented.');
+        }
+        clearStoredProgress() {
+            throw new Error('Method not implemented.');
+        }
     }
 
     var web = /*#__PURE__*/Object.freeze({
