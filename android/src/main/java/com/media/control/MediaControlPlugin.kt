@@ -260,32 +260,39 @@ class MediaControlPlugin : Plugin() {
     }
 
     private fun fetchPlaylistAnd(call: PluginCall, clearState: Boolean) {
-    
-            val ret = JSObject()
+        val ret = JSObject()
+
+        try {
             Thread {
                 Handler(Looper.getMainLooper()).post {
-                    val gson = Gson()
+                    try {
+                        val gson = Gson()
 
-                    val isComp = call.data.getString("completed")?.takeIf { it != "NaN" } ?: "true"
-                    if (isComp == "false") {
-                        ret.put("result", gson.toJson(mCurrentAudio.value))
-                    } else {
-                        mDBHelper = DBHelper(context)
-                        ret.put("result", gson.toJson(mDBHelper.allAudios))
+                        val isComp = call.data.getString("completed")?.takeIf { it != "NaN" } ?: "true"
+                        if (isComp == "false") {
+                            ret.put("result", gson.toJson(mCurrentAudio.value))
+                        } else {
+                            mDBHelper = DBHelper(context)
+                            ret.put("result", gson.toJson(mDBHelper.allAudios))
+                        }
+                        if (clearState) {
+                            clearPlaylist()
+                            mDBHelper.deleteAllAudio()
+                        }
+                        call.resolve(ret)
+                    } catch (e: Exception) {
+                        val error = JSObject()
+                        error.put("message", e.toString())
+                        call.reject(Const.ERROR, error)
                     }
-                    if (clearState) {
-                        clearPlaylist()
-                        mDBHelper.deleteAllAudio()
-                    }
-                    call.resolve(ret)
                 }
             }.start()
-        }  catch (e: Exception) {
-            val ret = JSObject()
-            ret.put("message", e.toString())
-            call.reject(Const.ERROR, ret)
+        } catch (e: Exception) {
+            val error = JSObject()
+            error.put("message", e.toString())
+            call.reject(Const.ERROR, error)
+        }
     }
-  }
 
 
     @PluginMethod
