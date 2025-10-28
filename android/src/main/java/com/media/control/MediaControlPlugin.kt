@@ -260,32 +260,39 @@ class MediaControlPlugin : Plugin() {
     }
 
     private fun fetchPlaylistAnd(call: PluginCall, clearState: Boolean) {
-    
-            val ret = JSObject()
+        val ret = JSObject()
+
+        try {
             Thread {
                 Handler(Looper.getMainLooper()).post {
-                    val gson = Gson()
+                    try {
+                        val gson = Gson()
 
-                    val isComp = call.data.getString("completed")?.takeIf { it != "NaN" } ?: "true"
-                    if (isComp == "false") {
-                        ret.put("result", gson.toJson(mCurrentAudio.value))
-                    } else {
-                        mDBHelper = DBHelper(context)
-                        ret.put("result", gson.toJson(mDBHelper.allAudios))
+                        val isComp = call.data.getString("completed")?.takeIf { it != "NaN" } ?: "true"
+                        if (isComp == "false") {
+                            ret.put("result", gson.toJson(mCurrentAudio.value))
+                        } else {
+                            mDBHelper = DBHelper(context)
+                            ret.put("result", gson.toJson(mDBHelper.allAudios))
+                        }
+                        if (clearState) {
+                            clearPlaylist()
+                            mDBHelper.deleteAllAudio()
+                        }
+                        call.resolve(ret)
+                    } catch (e: Exception) {
+                        val error = JSObject()
+                        error.put("message", e.toString())
+                        call.reject(Const.ERROR, error)
                     }
-                    if (clearState) {
-                        clearPlaylist()
-                        mDBHelper.deleteAllAudio()
-                    }
-                    call.resolve(ret)
                 }
             }.start()
-        }  catch (e: Exception) {
-            val ret = JSObject()
-            ret.put("message", e.toString())
-            call.reject(Const.ERROR, ret)
+        } catch (e: Exception) {
+            val error = JSObject()
+            error.put("message", e.toString())
+            call.reject(Const.ERROR, error)
+        }
     }
-  }
 
 
     @PluginMethod
@@ -293,19 +300,39 @@ class MediaControlPlugin : Plugin() {
         try {
             Thread {
                 Handler(Looper.getMainLooper()).post {
-                    if (call.data.getJSONArray("audioArray").length() > 1) {
-                        for (i in 0 until call.data.getJSONArray("audioArray").length()) {
-                            val mData: JSONObject =
-                                call.data.getJSONArray("audioArray").get(i) as JSONObject
+                    val audioArray = call.data.getJSONArray("audioArray")
+                    // Optional: insert at specific index (default -1 means append)
+                    var insertIndex = -1
+                    if (call.data.has("insertIndex")) {
+                        insertIndex = call.data.getInt("insertIndex")
+                    }
+                    
+                    if (audioArray.length() > 0) {
+                        for (i in 0 until audioArray.length()) {
+                            val mData: JSONObject = audioArray.get(i) as JSONObject
                             if (mCurrentAudio.value != null) {
                                 if (!mCurrentAudio.value!!.url.contains(mData.getString("audio"))) {
                                     if (::controller.isInitialized) {
-                                        controller.addMediaItem(buildMediaItem(mData))
+                                        val mediaItem = buildMediaItem(mData)
+                                        if (insertIndex >= 0) {
+                                            // Insert at specific index (for previous items)
+                                            val targetIndex = minOf(insertIndex + i, controller.mediaItemCount)
+                                            controller.addMediaItem(targetIndex, mediaItem)
+                                        } else {
+                                            // Append to end (default behavior)
+                                            controller.addMediaItem(mediaItem)
+                                        }
                                     }
                                 }
                             } else {
                                 if (::controller.isInitialized) {
-                                    controller.addMediaItem(buildMediaItem(mData))
+                                    val mediaItem = buildMediaItem(mData)
+                                    if (insertIndex >= 0) {
+                                        val targetIndex = minOf(insertIndex + i, controller.mediaItemCount)
+                                        controller.addMediaItem(targetIndex, mediaItem)
+                                    } else {
+                                        controller.addMediaItem(mediaItem)
+                                    }
                                 }
                             }
                         }
