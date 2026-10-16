@@ -279,6 +279,29 @@ export interface MediaControlPlugin {
     }>;
     clearStoredProgress(): void;
     /**
+     * Language and translated labels for the Android Auto library. Optional:
+     * without it the car uses the station's default language and the labels
+     * bundled with the web build. Android only.
+     *
+     */
+    setAutoConfig(options: AutoConfig): Promise<void>;
+    /**
+     * Audio the app finished downloading. Android Auto lists it under
+     * Downloads, plays it with no network, and the player uses the local file
+     * instead of the stream for the same URL. Send the full list on launch and
+     * whenever downloads change; each call replaces the previous list.
+     * Android only.
+     */
+    setAutoDownloads(options: {
+        items: AutoDownload[];
+    }): Promise<void>;
+    /**
+     * What the service is playing when Android Auto started it. Resolves to an
+     * empty object when nothing is playing or playback came from the app.
+     * Android only.
+     */
+    getNowPlaying(): Promise<Partial<AutoNowPlaying>>;
+    /**
      * Adds an event listener for player updates.
      *
      * @param {string} eventName - The name of the event to listen for (e.g., `'playerUpdates'`).
@@ -302,4 +325,52 @@ export interface MediaControlPlugin {
         duration: string;
         url: string;
     }) => void): Promise<PluginListenerHandle>;
+    /**
+     * Fires when Android Auto starts, changes or pauses a track. Android only.
+     */
+    addListener(eventName: "nowPlaying", listenerFunc: (data: AutoNowPlaying) => void): Promise<PluginListenerHandle>;
+}
+export interface AutoNowPlaying {
+    source: 'android_auto';
+    /** Audio URL, the same value `playerUpdates` reports as `url`. */
+    url: string;
+    title: string;
+    subtitle: string;
+    artwork: string;
+    state: 'PLAYING' | 'PAUSE';
+    /** Milliseconds, as strings like in `playerUpdates`. */
+    position: string;
+    duration: string;
+    kind: 'bible' | 'study' | 'unknown';
+    /** True when the track plays from a downloaded file. */
+    downloaded: boolean;
+    bookId?: string;
+    /** Bible chapter ID, e.g. "LUK.3". */
+    chapterId?: string;
+    /** CMP teaching UUID. */
+    studyId?: string;
+}
+export interface AutoConfig {
+    /** Station language `code`, e.g. "eng". */
+    languageCode?: string;
+    /** Keys: bible, study, old_testament, new_testament, guidelines, downloads, offline, unavailable. */
+    labels?: Record<string, string>;
+}
+export interface AutoDownload {
+    kind: 'bible' | 'study';
+    /** Bible chapter ID ("LUK.3") or CMP teaching UUID. */
+    id: string;
+    bookId: string;
+    bookName: string;
+    /** Sorts books in the Downloads list. */
+    bookOrder: number;
+    /** Chapter number, or the study's position inside its book. */
+    order: number;
+    title: string;
+    /** The streaming URL the app would otherwise play. */
+    remoteUrl: string;
+    /** Absolute path or file:// URI of the downloaded file. */
+    localPath: string;
+    artUrl?: string;
+    durationSeconds?: number;
 }

@@ -1,5 +1,5 @@
 import { WebPlugin } from '@capacitor/core';
-import type { MediaControlPlugin } from './definitions';
+import type { AutoConfig, AutoDownload, MediaControlPlugin } from './definitions';
 export declare class MediaControlWeb extends WebPlugin implements MediaControlPlugin {
     play(options: {
         audio: string;
@@ -47,5 +47,10 @@ export declare class MediaControlWeb extends WebPlugin implements MediaControlPl
     retrieveStoredProgress(): Promise<{
         result: JSON;
     }>;
+    getNowPlaying(): Promise<Record<string, never>>;
+    setAutoConfig(_options: AutoConfig): Promise<void>;
+    setAutoDownloads(_options: {
+        items: AutoDownload[];
+    }): Promise<void>;
     clearStoredProgress(): void;
 }
