@@ -7,6 +7,7 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import androidx.core.net.toUri
+import androidx.lifecycle.Observer
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
@@ -23,6 +24,11 @@ import com.getcapacitor.annotation.CapacitorPlugin
 import com.google.common.util.concurrent.ListenableFuture
 import com.google.common.util.concurrent.MoreExecutors
 import com.google.gson.Gson
+import com.media.control.auto.AutoArt
+import com.media.control.auto.AutoConfig
+import com.media.control.auto.AutoDownloads
+import com.media.control.auto.AutoLibrary
+import com.media.control.auto.MediaIds
 import com.media.control.constants.Const
 import com.media.control.helpers.DBHelper
 import com.media.control.model.AudioData
@@ -39,6 +45,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.net.HttpURLConnection
@@ -76,6 +83,38 @@ class MediaControlPlugin : Plugin() {
     private lateinit var controller: MediaController
     private var mediaControllerFuture: ListenableFuture<MediaController>? = null
 
+    // Android Auto can start playback while the app never called play(), so the
+    // plugin watches the service's player and reports those items to the app.
+    private var observedPlayer: Player? = null
+    private var adoptingAutoSession = false
+
+    private val autoPlaybackListener = object : Player.Listener {
+        override fun onEvents(player: Player, events: Player.Events) {
+            if (events.containsAny(
+                    Player.EVENT_MEDIA_ITEM_TRANSITION,
+                    Player.EVENT_IS_PLAYING_CHANGED,
+                    Player.EVENT_PLAYBACK_STATE_CHANGED
+                )
+            ) {
+                onAutoPlaybackChanged(player)
+            }
+        }
+    }
+
+    private val servicePlayerObserver = Observer<Player> { servicePlayer ->
+        if (servicePlayer !== observedPlayer) {
+            observedPlayer?.removeListener(autoPlaybackListener)
+            observedPlayer = servicePlayer
+            servicePlayer.addListener(autoPlaybackListener)
+            onAutoPlaybackChanged(servicePlayer)
+        }
+    }
+
+    override fun load() {
+        super.load()
+        handler.post { player.observeForever(servicePlayerObserver) }
+    }
+
     override fun handleOnStart() {
         super.handleOnStart()
 
@@ -102,6 +141,9 @@ class MediaControlPlugin : Plugin() {
         mediaControllerFuture?.let {
             MediaController.releaseFuture(it)
         }
+        player.removeObserver(servicePlayerObserver)
+        observedPlayer?.removeListener(autoPlaybackListener)
+        observedPlayer = null
         handler.removeCallbacks(playerPosition)
         seekUpdates?.cancel() // Clean up coroutine scope when plugin is destroyed
         seekUpdates = null
@@ -158,7 +200,7 @@ class MediaControlPlugin : Plugin() {
                     Thread {
                         Handler(Looper.getMainLooper()).post {
                             if (isLoaded) {
-                                stopMedia()
+                                stopMedia(keepSession = true)
                             }
 
                             this.call = call
@@ -215,6 +257,57 @@ class MediaControlPlugin : Plugin() {
             val ret = JSObject()
             ret.put("message", e.toString())
             call.reject(Const.ERROR, ret)
+        }
+    }
+
+    /**
+     * Language and translated labels for the Android Auto library. Optional:
+     * without it the car uses the station's default language.
+     */
+    @PluginMethod
+    fun setAutoConfig(call: PluginCall) {
+        try {
+            val languageCode = call.data.getString("languageCode")
+            val labels = call.data.optJSONObject("labels")
+            AutoConfig.saveOverrides(context, languageCode, labels)
+            AutoLibrary(context).invalidate()
+            handler.post { PlaybackService.notifyLibraryChanged() }
+            call.resolve()
+        } catch (e: Exception) {
+            val ret = JSObject()
+            ret.put("message", e.toString())
+            call.reject(Const.ERROR, ret)
+        }
+    }
+
+    /**
+     * Audio the app finished downloading, so Android Auto can list it and the
+     * player can use the local file instead of the stream. The app sends the
+     * full list each time; it replaces the previous one.
+     */
+    @PluginMethod
+    fun setAutoDownloads(call: PluginCall) {
+        try {
+            val items = call.data.optJSONArray("items") ?: JSONArray()
+            AutoDownloads.save(context, items)
+            handler.post { PlaybackService.notifyLibraryChanged() }
+            call.resolve()
+        } catch (e: Exception) {
+            val ret = JSObject()
+            ret.put("message", e.toString())
+            call.reject(Const.ERROR, ret)
+        }
+    }
+
+    /**
+     * What the service is playing when Android Auto started it, or an empty
+     * object. The app calls it on launch and resume, since `nowPlaying` events
+     * fired while the WebView was gone are lost.
+     */
+    @PluginMethod
+    fun getNowPlaying(call: PluginCall) {
+        handler.post {
+            call.resolve(observedPlayer?.let { autoNowPlaying(it) } ?: JSObject())
         }
     }
 
@@ -624,6 +717,76 @@ class MediaControlPlugin : Plugin() {
         }.start()
     }
 
+    private fun onAutoPlaybackChanged(servicePlayer: Player) {
+        val nowPlaying = autoNowPlaying(servicePlayer) ?: return
+        adoptAutoSession()
+        notifyListeners("nowPlaying", nowPlaying)
+    }
+
+    private fun autoNowPlaying(servicePlayer: Player): JSObject? {
+        val item = servicePlayer.currentMediaItem ?: return null
+        val browseId = item.mediaMetadata.extras?.getString(PlaybackService.EXTRA_AUTO_BROWSE_ID) ?: return null
+        val metadata = item.mediaMetadata
+        return JSObject().apply {
+            put("source", "android_auto")
+            put("url", item.mediaId)
+            put("title", metadata.title?.toString() ?: "")
+            put("subtitle", metadata.artist?.toString() ?: "")
+            put("artwork", metadata.extras?.getString(PlaybackService.EXTRA_ART_URL) ?: metadata.artworkUri?.toString() ?: "")
+            put("state", if (servicePlayer.isPlaying) Const.PLAYING else Const.PAUSE)
+            put("position", servicePlayer.currentPosition.coerceAtLeast(0L).toString())
+            put("duration", servicePlayer.duration.coerceAtLeast(0L).toString())
+            put("downloaded", item.localConfiguration?.uri?.scheme == "file")
+            when (val parsed = MediaIds.parse(MediaIds.catalogId(browseId))) {
+                is MediaIds.Parsed.ChapterId -> {
+                    put("kind", "bible")
+                    put("bookId", parsed.bookId)
+                    put("chapterId", parsed.chapterId)
+                }
+                is MediaIds.Parsed.StudyItemId -> {
+                    put("kind", "study")
+                    put("bookId", parsed.bookId)
+                    put("studyId", parsed.uuid)
+                }
+                else -> put("kind", "unknown")
+            }
+        }
+    }
+
+    /**
+     * pause(), resume(), seek() and `playerUpdates` all go through `controller`,
+     * which only exists after the app calls play(). When the car started
+     * playback, connect one so the app's mini player can drive it.
+     */
+    private fun adoptAutoSession() {
+        // load() only replaces a track it considers loaded; without this, an app
+        // load() while the car's track is paused never resolves.
+        isLoaded = true
+        if (::controller.isInitialized) {
+            speedSet = false
+            seekSet = false
+            isPaused = !controller.isPlaying
+            if (controller.isPlaying) startNotifyingPlayerUpdates()
+            return
+        }
+        if (adoptingAutoSession) return
+        adoptingAutoSession = true
+        val sessionToken = SessionToken(context, ComponentName(context, PlaybackService::class.java))
+        val future = MediaController.Builder(context, sessionToken).buildAsync()
+        mediaControllerFuture = future
+        future.addListener({
+            adoptingAutoSession = false
+            val connected = runCatching { future.get() }.getOrNull() ?: return@addListener
+            controller = connected
+            // The app's speed and start position must not be applied to the car's track.
+            speedSet = false
+            seekSet = false
+            isPaused = !connected.isPlaying
+            mediaControllerUpdates(connected)
+            startNotifyingPlayerUpdates()
+        }, MoreExecutors.directExecutor())
+    }
+
     private fun verifyAudio(audio: String): Boolean {
         return if (audio.contains("http")) {
             try {
@@ -648,7 +811,7 @@ class MediaControlPlugin : Plugin() {
             .setMediaId(mAudioData.url)
             .setMediaMetadata(
                 MediaMetadata.Builder().setFolderType(MediaMetadata.FOLDER_TYPE_ALBUMS)
-                    .setArtworkUri(Uri.parse(mAudioData.image)).setTitle(mAudioData.title)
+                    .setArtworkUri(AutoArt.uri(context, mAudioData.image)).setTitle(mAudioData.title)
                     .setAlbumTitle(mAudioData.title).build()
             ).build()
     }
@@ -662,7 +825,7 @@ class MediaControlPlugin : Plugin() {
         val mediaMetadata = MediaMetadata.Builder().apply {
             setAlbumTitle(mJson.getString("title") as String)
             setTitle(mJson.getString("title") as String)
-            setArtworkUri(Uri.parse(mJson.getString("cover") as String))
+            setArtworkUri(AutoArt.uri(context, mJson.getString("cover") as String))
         }.build()
 
         return MediaItem.Builder().apply {
@@ -683,23 +846,18 @@ class MediaControlPlugin : Plugin() {
                 mediaControllerUpdates(controller)
                 // Ensure media is played appropriately based on state
 //                Log.d(TAG, "INITIAL STATE = ${controller.playbackState}")
-                if (controller.playbackState == Player.STATE_IDLE || controller.playbackState == Player.STATE_ENDED) {
-                    if (loadItem) {
-                        loadMedia()
-                    } else {
-                        controller.setMediaItem(mediaBuilder())
-                        playMedia() // Play if IDLE or ENDED
-                    }
+                if (loadItem) {
+                    if (controller.isPlaying) stopMedia(keepSession = true)
+                    loadMedia()
+                } else if (controller.playbackState == Player.STATE_IDLE || controller.playbackState == Player.STATE_ENDED) {
+                    controller.setMediaItem(mediaBuilder())
+                    playMedia() // Play if IDLE or ENDED
                 } else if (controller.playbackState == Player.STATE_READY || controller.playbackState == Player.STATE_BUFFERING) {
                     if (controller.playWhenReady) {
                         if (controller.isPlaying) {
-                            stopMedia()
-                            if (loadItem) {
-                                loadMedia()
-                            } else {
-                                controller.setMediaItem(mediaBuilder())
-                                playMedia() // Play if READY OR BUFFERING
-                            }
+                            stopMedia(keepSession = true)
+                            controller.setMediaItem(mediaBuilder())
+                            playMedia() // Play if READY OR BUFFERING
                         }
                     }
                 }
@@ -723,7 +881,12 @@ class MediaControlPlugin : Plugin() {
         call.resolve(ret)
     }
 
-    private fun stopMedia() {
+    /**
+     * [keepSession] is for replacing the track: Android Auto closes its player
+     * when the session goes idle or empty, so the old item stays until the new
+     * one replaces it.
+     */
+    private fun stopMedia(keepSession: Boolean = false) {
         mPlayerState.value = null
         seekUpdates?.cancel()
         seekUpdates = null
@@ -741,8 +904,14 @@ class MediaControlPlugin : Plugin() {
 
         playbackPos = Const.DEFAUT_POS
 
-        controller.stop()
-        controller.clearMediaItems()
+        if (keepSession) {
+            controller.pause()
+            PlaybackService.awaitingPlay = true
+        } else {
+            PlaybackService.awaitingPlay = false
+            controller.stop()
+            controller.clearMediaItems()
+        }
     }
 
     private fun audioCompleted() {
@@ -814,7 +983,8 @@ class MediaControlPlugin : Plugin() {
 //                        Log.d("ExoPlayer", "Buffered: $bufferedPercentage%")
 
                         // Check if the audio is fully buffered
-                        if (bufferedPercentage == 100) {
+                        // While a swap waits for playLoaded() the reported state is buffering on purpose.
+                        if (bufferedPercentage == 100 && !PlaybackService.awaitingPlay) {
 //                            Log.d("ExoPlayer", "Fully buffered. Starting playback.")
                             controller.playWhenReady = true
                         }

@@ -54,6 +54,15 @@ var capacitorMediaPlayer = (function (exports, core) {
         retrieveStoredProgress() {
             throw new Error('Method not implemented.');
         }
+        getNowPlaying() {
+            return Promise.resolve({});
+        }
+        setAutoConfig(_options) {
+            return Promise.resolve();
+        }
+        setAutoDownloads(_options) {
+            return Promise.resolve();
+        }
         clearStoredProgress() {
             throw new Error('Method not implemented.');
         }

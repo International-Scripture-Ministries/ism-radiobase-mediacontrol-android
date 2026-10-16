@@ -1,6 +1,6 @@
 import { WebPlugin} from '@capacitor/core';
 
-import type {MediaControlPlugin} from './definitions';
+import type {AutoConfig, AutoDownload, MediaControlPlugin} from './definitions';
 
 export class MediaControlWeb extends WebPlugin implements MediaControlPlugin {
 
@@ -66,6 +66,18 @@ export class MediaControlWeb extends WebPlugin implements MediaControlPlugin {
 
     retrieveStoredProgress(): Promise<{result: JSON;}> {
         throw new Error('Method not implemented.');
+    }
+
+    getNowPlaying(): Promise<Record<string, never>> {
+        return Promise.resolve({});
+    }
+
+    setAutoConfig(_options: AutoConfig): Promise<void> {
+        return Promise.resolve();
+    }
+
+    setAutoDownloads(_options: { items: AutoDownload[] }): Promise<void> {
+        return Promise.resolve();
     }
 
     clearStoredProgress(): void {

@@ -59,4 +59,8 @@ dependencies {
     implementation("androidx.media3:media3-common:1.5.1")
     implementation("androidx.media3:media3-session:1.5.1")
     implementation("androidx.media3:media3-extractor:1.5.1")
+
+    testImplementation 'junit:junit:4.13.2'
+    // Android's org.json is a stub on the JVM; the real one runs the parser tests.
+    testImplementation 'org.json:json:20240303'
 }
