@@ -16,22 +16,26 @@ class LibraryTreeTest {
 
     private val studyBooks = listOf(
         StudyBook("GDL", "Guías", Testament.OTHER, 0, "https://x/GDL.png", 10),
-        StudyBook("LUK", "Lucas", Testament.NEW, 3, "https://x/LUK.png", 29),
+        StudyBook("GEN", "Génesis", Testament.OLD, 1, "https://x/GEN.png", 55),
+        StudyBook("MAT", "Mateo", Testament.NEW, 2, "https://x/MAT.png", 39),
     )
 
     @Test
-    fun `root shows one tab per available content type`() {
-        assertEquals(listOf(MediaIds.BIBLE, MediaIds.STUDY), LibraryTree.root(labels, true, true).map { it.id })
-        assertEquals(listOf(MediaIds.STUDY), LibraryTree.root(labels, false, true).map { it.id })
-        assertEquals("Biblia", LibraryTree.root(labels, true, false).single().title)
+    fun `root shows one tab per available content type, then Downloads`() {
+        assertEquals(
+            listOf(MediaIds.BIBLE, MediaIds.STUDY, MediaIds.DOWNLOADS),
+            LibraryTree.root(labels, true, true).map { it.id }
+        )
+        assertEquals(listOf(MediaIds.STUDY, MediaIds.DOWNLOADS), LibraryTree.root(labels, false, true).map { it.id })
+        assertEquals("Biblia", LibraryTree.root(labels, true, false).first().title)
     }
 
     @Test
-    fun `root with nothing available shows a message row`() {
-        val only = LibraryTree.root(labels, false, false).single()
-        assertEquals(MediaIds.MESSAGE, only.id)
-        assertFalse(only.browsable)
-        assertFalse(only.playable)
+    fun `root with nothing available shows a message row above Downloads`() {
+        val nodes = LibraryTree.root(labels, false, false)
+        assertEquals(listOf(MediaIds.MESSAGE, MediaIds.DOWNLOADS), nodes.map { it.id })
+        assertFalse(nodes[0].browsable)
+        assertFalse(nodes[0].playable)
     }
 
     @Test
@@ -48,11 +52,11 @@ class LibraryTreeTest {
     }
 
     @Test
-    fun `study puts guidelines first and keeps them out of the testament lists`() {
-        val nodes = LibraryTree.studyTestaments(labels, studyBooks)
-        assertEquals(listOf(MediaIds.STUDY_GUIDELINES, MediaIds.STUDY_NEW), nodes.map { it.id })
+    fun `study is one list of books in study order, guidelines included`() {
+        val nodes = LibraryTree.studyBooks(studyBooks)
+        assertEquals(listOf("study/book/GDL", "study/book/GEN", "study/book/MAT"), nodes.map { it.id })
         assertEquals("Guías", nodes[0].title)
-        assertTrue(LibraryTree.studyBooks(studyBooks, Testament.OTHER).isEmpty())
+        assertTrue(nodes.all { it.browsable })
     }
 
     @Test
@@ -82,7 +86,7 @@ class LibraryTreeTest {
         assertEquals(MediaIds.Parsed.ChapterId("LUK.3", "LUK"), MediaIds.parse(MediaIds.chapter("LUK.3")))
         assertEquals(MediaIds.Parsed.StudyItemId("LUK", "abc"), MediaIds.parse(MediaIds.studyItem("LUK", "abc")))
         assertEquals(MediaIds.Parsed.BibleBookId("GEN"), MediaIds.parse(MediaIds.bibleBook("GEN")))
-        assertEquals(MediaIds.Parsed.Node(MediaIds.STUDY_OLD), MediaIds.parse(MediaIds.STUDY_OLD))
+        assertEquals(MediaIds.Parsed.Node(MediaIds.STUDY), MediaIds.parse(MediaIds.STUDY))
         assertEquals(MediaIds.Parsed.Unknown, MediaIds.parse("https://cdn/LUK.3.mp3"))
         assertFalse(MediaIds.isBrowseId("https://cdn/LUK.3.mp3"))
         assertFalse(MediaIds.isBrowseId("/data/user/0/app/files/study.mp3"))

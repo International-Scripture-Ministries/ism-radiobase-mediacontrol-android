@@ -61,19 +61,16 @@ class DownloadsTest {
     }
 
     @Test
-    fun `root adds Downloads only when something was downloaded`() {
-        assertEquals(
-            listOf(MediaIds.BIBLE, MediaIds.STUDY, MediaIds.DOWNLOADS),
-            LibraryTree.root(labels, true, true, hasDownloads = true).map { it.id }
-        )
-        assertEquals(listOf(MediaIds.BIBLE), LibraryTree.root(labels, true, false, hasDownloads = false).map { it.id })
+    fun `offline root keeps Downloads above the message`() {
+        val nodes = LibraryTree.offlineRoot(labels)
+        assertEquals(listOf(MediaIds.DOWNLOADS, MediaIds.MESSAGE), nodes.map { it.id })
     }
 
     @Test
-    fun `offline root keeps Downloads above the message`() {
-        val nodes = LibraryTree.offlineRoot(labels, hasDownloads = true)
-        assertEquals(listOf(MediaIds.DOWNLOADS, MediaIds.MESSAGE), nodes.map { it.id })
-        assertEquals(listOf(MediaIds.MESSAGE), LibraryTree.offlineRoot(labels, hasDownloads = false).map { it.id })
+    fun `downloads with nothing downloaded says so`() {
+        val only = LibraryTree.downloadsRoot(labels.copy(noDownloads = "Sin descargas"), DownloadIndex.EMPTY).single()
+        assertEquals(MediaIds.MESSAGE, only.id)
+        assertEquals("Sin descargas", only.title)
     }
 
     @Test

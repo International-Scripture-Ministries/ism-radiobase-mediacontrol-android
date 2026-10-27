@@ -10,9 +10,6 @@ object MediaIds {
     const val BIBLE_OLD = "bible/ot"
     const val BIBLE_NEW = "bible/nt"
     const val STUDY = "study"
-    const val STUDY_GUIDELINES = "study/gdl"
-    const val STUDY_OLD = "study/ot"
-    const val STUDY_NEW = "study/nt"
     const val MESSAGE = "message"
 
     /**
@@ -27,9 +24,7 @@ object MediaIds {
     private const val STUDY_BOOK = "study/book/"
     private const val STUDY_ITEM = "study/item/"
 
-    const val GUIDELINES_BOOK_ID = "GDL"
-
-    private val NODES = setOf(ROOT, BIBLE, BIBLE_OLD, BIBLE_NEW, STUDY, STUDY_GUIDELINES, STUDY_OLD, STUDY_NEW)
+    private val NODES = setOf(ROOT, BIBLE, BIBLE_OLD, BIBLE_NEW, STUDY)
 
     fun bibleBook(bookId: String) = BIBLE_BOOK + bookId
     fun chapter(chapterId: String) = CHAPTER + chapterId
@@ -73,8 +68,8 @@ data class Labels(
     val study: String = "Study",
     val oldTestament: String = "Old Testament",
     val newTestament: String = "New Testament",
-    val guidelines: String = "Guidelines",
     val downloads: String = "Downloads",
+    val noDownloads: String = "No downloaded data",
     val offline: String = "No connection. Try again when you have signal.",
     val unavailable: String = "Content not available in this language.",
 )
@@ -96,24 +91,24 @@ data class LibraryNode(
 /** Builds the nodes Android Auto shows. Pure functions, covered by unit tests. */
 object LibraryTree {
 
-    fun root(labels: Labels, hasBible: Boolean, hasStudies: Boolean, hasDownloads: Boolean = false): List<LibraryNode> {
-        val tabs = buildList {
+    /** Downloads is always there, as in CarPlay, even before anything was downloaded. */
+    fun root(labels: Labels, hasBible: Boolean, hasStudies: Boolean): List<LibraryNode> {
+        val content = buildList {
             if (hasBible) add(LibraryNode(MediaIds.BIBLE, labels.bible))
             if (hasStudies) add(LibraryNode(MediaIds.STUDY, labels.study))
-            if (hasDownloads) add(LibraryNode(MediaIds.DOWNLOADS, labels.downloads))
         }
-        return tabs.ifEmpty { listOf(message(labels.unavailable)) }
+        return content.ifEmpty { listOf(message(labels.unavailable)) } + downloadsTab(labels)
     }
 
     /** Root when the catalog cannot load: downloads stay reachable. */
-    fun offlineRoot(labels: Labels, hasDownloads: Boolean): List<LibraryNode> = buildList {
-        if (hasDownloads) add(LibraryNode(MediaIds.DOWNLOADS, labels.downloads))
-        add(message(labels.offline))
-    }
+    fun offlineRoot(labels: Labels): List<LibraryNode> = listOf(downloadsTab(labels), message(labels.offline))
+
+    private fun downloadsTab(labels: Labels) = LibraryNode(MediaIds.DOWNLOADS, labels.downloads)
 
     /** Bible and Study folders, or straight to the books when only one kind was downloaded. */
     fun downloadsRoot(labels: Labels, index: DownloadIndex): List<LibraryNode> {
         val kinds = index.kinds()
+        if (kinds.isEmpty()) return listOf(message(labels.noDownloads))
         if (kinds.size == 1) return downloadBooks(index, kinds.single())
         return kinds.map {
             when (it) {
@@ -166,21 +161,17 @@ object LibraryTree {
         if (books.any { it.testament == Testament.NEW }) add(LibraryNode(MediaIds.BIBLE_NEW, labels.newTestament))
     }
 
-    fun studyTestaments(labels: Labels, books: List<StudyBook>): List<LibraryNode> = buildList {
-        books.firstOrNull { it.id == MediaIds.GUIDELINES_BOOK_ID }?.let {
-            add(LibraryNode(MediaIds.STUDY_GUIDELINES, it.name.ifEmpty { labels.guidelines }, artUrl = it.artUrl))
-        }
-        if (books.any { it.testament == Testament.OLD }) add(LibraryNode(MediaIds.STUDY_OLD, labels.oldTestament))
-        if (books.any { it.testament == Testament.NEW }) add(LibraryNode(MediaIds.STUDY_NEW, labels.newTestament))
-    }
-
     fun bibleBooks(books: List<BibleBook>, testament: Testament): List<LibraryNode> =
         books.filter { it.testament == testament }
             .map { LibraryNode(MediaIds.bibleBook(it.id), it.name, artUrl = it.artUrl) }
 
-    fun studyBooks(books: List<StudyBook>, testament: Testament): List<LibraryNode> =
-        books.filter { it.testament == testament && it.id != MediaIds.GUIDELINES_BOOK_ID }
-            .map { LibraryNode(MediaIds.studyBook(it.id), it.name, artUrl = it.artUrl) }
+    /**
+     * One list in study order, Guidelines included, as the app and CarPlay show
+     * it. The order mixes testaments (Genesis, Matthew, Exodus...), so splitting
+     * by testament would lose it.
+     */
+    fun studyBooks(books: List<StudyBook>): List<LibraryNode> =
+        books.map { LibraryNode(MediaIds.studyBook(it.id), it.name, artUrl = it.artUrl) }
 
     /** Rows in the chapter list show only the number, as in CarPlay. */
     fun chapterRows(chapters: List<Chapter>, bookName: String, bookArt: String): List<LibraryNode> =

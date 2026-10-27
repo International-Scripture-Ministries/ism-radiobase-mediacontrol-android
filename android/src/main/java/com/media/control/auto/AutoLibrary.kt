@@ -36,26 +36,39 @@ class AutoLibrary(private val context: Context) {
         val session = runCatching { session() }.getOrNull()
         val labels = session?.labels ?: labels(AutoConfig.overrides(context).labels, languageCode = null)
         if (MediaIds.isDownloadsId(parentId)) return downloadChildren(labels, downloads, parentId)
-        val nodes = session?.let { runCatching { childrenOf(it, parentId, downloads) }.getOrNull() }
+        val nodes = session?.let { runCatching { childrenOf(it, parentId) }.getOrNull() }
             ?: return offlineChildren(labels, downloads, parentId)
         return LibraryTree.withDownloads(nodes, downloads)
     }
 
     /**
-     * The tapped track's book as a queue, plus the next book so playback keeps
-     * going. When the catalog cannot load, a downloaded track still plays from
-     * the downloads queue.
+     * The tapped track's book as a queue. The next book comes separately from
+     * [nextBookTracks], so the first track does not wait for it. When the
+     * catalog cannot load, a downloaded track still plays from the downloads queue.
      */
-    fun queueFor(mediaId: String, withNextBook: Boolean = true): Queue? {
+    fun queueFor(mediaId: String): Queue? {
         val downloads = AutoDownloads.index(context)
         if (MediaIds.isDownloadsId(mediaId)) return downloadQueue(downloads, mediaId)
-        val queue = runCatching { catalogQueue(mediaId, withNextBook) }.getOrNull()
+        val queue = runCatching { catalogQueue(mediaId) }.getOrNull()
             ?: return downloadQueue(downloads, MediaIds.downloads(mediaId))
         return queue.copy(items = LibraryTree.withDownloads(queue.items, downloads))
     }
 
-    fun item(mediaId: String): LibraryNode? =
-        queueFor(mediaId, withNextBook = false)?.let { it.items[it.startIndex] }
+    /** Tracks of the book after [mediaId]'s, so playback keeps going past the end of the book. */
+    fun nextBookTracks(mediaId: String): List<LibraryNode> {
+        if (MediaIds.isDownloadsId(mediaId)) return emptyList()
+        val session = session()
+        val tracks = when (val parsed = MediaIds.parse(mediaId)) {
+            is MediaIds.Parsed.ChapterId ->
+                nextBook(bibleBooks(session), parsed.bookId)?.let { chapterTracks(session, it) }
+            is MediaIds.Parsed.StudyItemId ->
+                nextBook(studyBooks(session), parsed.bookId)?.let { studyTracks(session, it) }
+            else -> null
+        }
+        return LibraryTree.withDownloads(tracks.orEmpty(), AutoDownloads.index(context))
+    }
+
+    fun item(mediaId: String): LibraryNode? = queueFor(mediaId)?.let { it.items[it.startIndex] }
 
     /** Drops cached responses, e.g. after the app switches language. */
     fun invalidate() {
@@ -76,7 +89,7 @@ class AutoLibrary(private val context: Context) {
 
     /** No catalog: the root keeps the downloads branch, a book shows what was downloaded from it. */
     private fun offlineChildren(labels: Labels, downloads: DownloadIndex, parentId: String): List<LibraryNode> {
-        if (parentId == MediaIds.ROOT) return LibraryTree.offlineRoot(labels, !downloads.isEmpty())
+        if (parentId == MediaIds.ROOT) return LibraryTree.offlineRoot(labels)
         return downloadedRows(downloads, MediaIds.parse(parentId)).ifEmpty { listOf(LibraryTree.message(labels.offline)) }
     }
 
@@ -93,36 +106,25 @@ class AutoLibrary(private val context: Context) {
         return Queue(tracks.map(LibraryTree::downloadTrack), tracks.indexOf(target))
     }
 
-    private fun catalogQueue(mediaId: String, withNextBook: Boolean): Queue? {
+    private fun catalogQueue(mediaId: String): Queue? {
         val session = session()
-        return when (val parsed = MediaIds.parse(mediaId)) {
+        val tracks = when (val parsed = MediaIds.parse(mediaId)) {
             is MediaIds.Parsed.ChapterId ->
-                bookQueue(mediaId, bibleBooks(session), parsed.bookId, withNextBook) { chapterTracks(session, it) }
+                bibleBooks(session).firstOrNull { it.id == parsed.bookId }?.let { chapterTracks(session, it) }
             is MediaIds.Parsed.StudyItemId ->
-                bookQueue(mediaId, studyBooks(session), parsed.bookId, withNextBook) { studyTracks(session, it) }
+                studyBooks(session).firstOrNull { it.id == parsed.bookId }?.let { studyTracks(session, it) }
             else -> null
-        }
-    }
-
-    private fun <B : Book> bookQueue(
-        mediaId: String,
-        books: List<B>,
-        bookId: String,
-        withNextBook: Boolean,
-        tracksOf: (B) -> List<LibraryNode>,
-    ): Queue? {
-        val index = books.indexOfFirst { it.id == bookId }
-        if (index < 0) return null
-        val tracks = tracksOf(books[index]).toMutableList()
+        } ?: return null
         val start = tracks.indexOfFirst { it.id == mediaId }
-        if (start < 0) return null
-        if (withNextBook) {
-            books.getOrNull(index + 1)?.let { next -> runCatching { tracks += tracksOf(next) } }
-        }
-        return Queue(tracks, start)
+        return if (start < 0) null else Queue(tracks, start)
     }
 
-    private fun childrenOf(session: Session, parentId: String, downloads: DownloadIndex): List<LibraryNode> {
+    private fun <B : Book> nextBook(books: List<B>, bookId: String): B? {
+        val index = books.indexOfFirst { it.id == bookId }
+        return if (index < 0) null else books.getOrNull(index + 1)
+    }
+
+    private fun childrenOf(session: Session, parentId: String): List<LibraryNode> {
         val labels = session.labels
         return when (val parsed = MediaIds.parse(parentId)) {
             is MediaIds.Parsed.Node -> when (parsed.id) {
@@ -130,15 +132,11 @@ class AutoLibrary(private val context: Context) {
                     labels,
                     hasBible = session.language.audioId.isNotEmpty(),
                     hasStudies = runCatching { studyBooks(session).isNotEmpty() }.getOrDefault(false),
-                    hasDownloads = !downloads.isEmpty(),
                 )
                 MediaIds.BIBLE -> LibraryTree.bibleTestaments(labels, bibleBooks(session))
                 MediaIds.BIBLE_OLD -> LibraryTree.bibleBooks(bibleBooks(session), Testament.OLD)
                 MediaIds.BIBLE_NEW -> LibraryTree.bibleBooks(bibleBooks(session), Testament.NEW)
-                MediaIds.STUDY -> LibraryTree.studyTestaments(labels, studyBooks(session))
-                MediaIds.STUDY_OLD -> LibraryTree.studyBooks(studyBooks(session), Testament.OLD)
-                MediaIds.STUDY_NEW -> LibraryTree.studyBooks(studyBooks(session), Testament.NEW)
-                MediaIds.STUDY_GUIDELINES -> studyRows(session, MediaIds.GUIDELINES_BOOK_ID)
+                MediaIds.STUDY -> LibraryTree.studyBooks(studyBooks(session))
                 else -> emptyList()
             }
             is MediaIds.Parsed.BibleBookId -> {
@@ -214,18 +212,23 @@ class AutoLibrary(private val context: Context) {
         val bundled = languageCode
             ?.let { bundledAsset("public/assets/i18n/cdn/${it.lowercase()}.json") }
             ?.let { runCatching { JSONObject(it) }.getOrNull() }
-        fun pick(key: String, fallback: String, bundledSection: String? = null): String =
-            pushed[key]?.takeIf { it.isNotEmpty() }
-                ?: bundledSection?.let { bundled?.optJSONObject(it)?.optString(key) }?.takeIf { it.isNotEmpty() }
-                ?: fallback
+        /** [bundledPath] is the key in the translation file, after its sections. */
+        fun pick(key: String, fallback: String, vararg bundledPath: String): String {
+            val translated = bundledPath.takeIf { it.isNotEmpty() }?.let { path ->
+                path.dropLast(1).fold(bundled as JSONObject?) { section, name -> section?.optJSONObject(name) }
+                    ?.optString(path.last())
+            }
+            return pushed[key]?.takeIf { it.isNotEmpty() } ?: translated?.takeIf { it.isNotEmpty() } ?: fallback
+        }
         val defaults = Labels()
         return Labels(
-            bible = pick("bible", defaults.bible, "BIBLE"),
-            study = pick("study", defaults.study, "SIDEBAR"),
-            oldTestament = pick("old_testament", defaults.oldTestament, "BIBLE"),
-            newTestament = pick("new_testament", defaults.newTestament, "BIBLE"),
-            guidelines = pick("guidelines", defaults.guidelines),
-            downloads = pick("downloads", defaults.downloads),
+            bible = pick("bible", defaults.bible, "BIBLE", "bible"),
+            study = pick("study", defaults.study, "SIDEBAR", "study"),
+            oldTestament = pick("old_testament", defaults.oldTestament, "BIBLE", "old_testament"),
+            newTestament = pick("new_testament", defaults.newTestament, "BIBLE", "new_testament"),
+            // The same keys CarPlay uses.
+            downloads = pick("downloads", defaults.downloads, "Manage_Downloads"),
+            noDownloads = pick("no_downloads", defaults.noDownloads, "no_downloaded_data"),
             offline = pick("offline", defaults.offline),
             unavailable = pick("unavailable", defaults.unavailable),
         )

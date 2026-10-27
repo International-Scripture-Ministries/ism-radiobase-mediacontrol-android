@@ -310,8 +310,8 @@ class PlaybackService : MediaLibraryService(), MediaLibrarySession.Callback {
 
     /**
      * Android Auto sends the browse ID of the row the driver tapped. It becomes
-     * the whole book (plus the next one) as a queue, so playback continues on
-     * its own like it does in the app.
+     * the whole book as a queue, and the next book joins it once the track
+     * started, so playback continues on its own like it does in the app.
      */
     override fun onSetMediaItems(
         mediaSession: MediaSession,
@@ -325,6 +325,7 @@ class PlaybackService : MediaLibraryService(), MediaLibrarySession.Callback {
             return libraryExecutor.submit<MediaItemsWithStartPosition> {
                 val queue = library.queueFor(tapped)
                     ?: throw IllegalArgumentException("No queue for $tapped")
+                appendNextBook(queue.items.last().id)
                 MediaItemsWithStartPosition(
                     queue.items.map { it.toPlayerItem() },
                     queue.startIndex,
@@ -397,7 +398,36 @@ class PlaybackService : MediaLibraryService(), MediaLibrarySession.Callback {
         return libraryExecutor.submit<MediaItemsWithStartPosition> {
             val queue = library.queueFor(browseId)
                 ?: throw IllegalStateException("Cannot rebuild queue for $browseId")
+            appendNextBook(queue.items.last().id)
             MediaItemsWithStartPosition(queue.items.map { it.toPlayerItem() }, queue.startIndex, position)
+        }
+    }
+
+    /**
+     * Fetching the next book used to hold back the first track by one or two
+     * requests, which on a weak car connection meant several seconds of
+     * silence. It now loads in the background and joins the end of the queue.
+     * Media3 hands the queue to the player only after this call returns, so
+     * the append waits until the queue still ends with [lastBrowseId]; if the
+     * driver picked something else meanwhile, it gives up.
+     */
+    private fun appendNextBook(lastBrowseId: String) {
+        libraryExecutor.execute {
+            val tracks = runCatching { library.nextBookTracks(lastBrowseId) }.getOrNull()
+            if (tracks.isNullOrEmpty()) return@execute
+            val items = tracks.map { it.toPlayerItem() }
+            var attempts = 0
+            mainHandler.post(object : Runnable {
+                override fun run() {
+                    val current = playerInstance ?: return
+                    val count = current.mediaItemCount
+                    if (count > 0 && current.getMediaItemAt(count - 1).autoBrowseId() == lastBrowseId) {
+                        current.addMediaItems(items)
+                    } else if (++attempts < APPEND_ATTEMPTS) {
+                        mainHandler.postDelayed(this, APPEND_RETRY_MS)
+                    }
+                }
+            })
         }
     }
 
@@ -476,6 +506,11 @@ class PlaybackService : MediaLibraryService(), MediaLibrarySession.Callback {
     ): MediaSession.ConnectionResult {
         val connectionResult = super.onConnect(session, controller)
         val availableSessionCommands = connectionResult.availableSessionCommands.buildUpon()
+            // Media3 advertises search to Android Auto whenever these are
+            // available. The library has no search, so the button only led to
+            // a keyboard and an empty result.
+            .remove(SessionCommand.COMMAND_CODE_LIBRARY_SEARCH)
+            .remove(SessionCommand.COMMAND_CODE_LIBRARY_GET_SEARCH_RESULT)
 
         /* Registering custom player command buttons for player notification. */
         notificationPlayerCustomCommandButtons.forEach { commandButton ->
@@ -562,6 +597,8 @@ class PlaybackService : MediaLibraryService(), MediaLibrarySession.Callback {
     companion object {
         private const val BUFFER_AHEAD_MS = 10 * 60 * 1000
         private const val STREAM_RETRY_MS = 5_000L
+        private const val APPEND_RETRY_MS = 250L
+        private const val APPEND_ATTEMPTS = 20
         /** Present on player items started from Android Auto; holds their browse ID. */
         const val EXTRA_AUTO_BROWSE_ID = "com.media.control.AUTO_BROWSE_ID"
         /** The cover's web URL; the artwork URI may point at the local copy instead. */
